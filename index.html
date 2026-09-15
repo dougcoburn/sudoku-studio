@@ -36,6 +36,8 @@
     .board-actions { display: flex; align-items: center; gap: 3px; }
     .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; background: transparent; border: 0; border-radius: 6px; }
     .icon-button:hover:enabled { background: var(--green-soft); }
+    .icon-button[aria-pressed="true"] { color: var(--surface); background: var(--green); }
+    .icon-button[data-temporary="true"] { outline: 1px dashed var(--green); outline-offset: 2px; }
     .divider { height: 17px; width: 1px; background: var(--line); margin: 0 7px; }
     .text-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 6px 9px; border: 0; background: transparent; border-radius: 6px; color: var(--muted); font-size: 12px; }
     .text-button:hover:enabled { background: var(--green-soft); color: var(--ink); }
@@ -134,6 +136,9 @@
     .hint-notes .pencil-note { font-size: 13px; min-height: 27px; border-radius: 4px; background: #f0f3ec; }
     .pencil-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); height: 100%; width: 100%; padding: 3px; }
     .pencil-note { display: flex; align-items: center; justify-content: center; font-size: clamp(9px, 1.2vw, 12px); font-weight: 500; line-height: 1; color: #54644f; }
+    .manual-notes .pencil-note { color: #326b93; }
+    .penciling .cell.selected { box-shadow: inset 0 0 0 2px #326b93; }
+    .teaching #entry-controls { margin-bottom: 18px; }
     .pencil-note.cut { color: var(--step-color); background: var(--step-bg); text-decoration: line-through; text-decoration-thickness: 1.5px; }
     .pencil-note.kept { color: #204b32; background: #dcebcf; border-radius: 3px; font-weight: 750; }
     .cell.hint-support { background: var(--step-bg); box-shadow: inset 0 0 0 1px var(--step-color); }
@@ -222,6 +227,7 @@
     <symbol id="i-undo" viewBox="0 0 24 24"><path d="m8 4-5 5 5 5M3 9h10a7 7 0 0 1 0 14" transform="translate(0 -2)"/></symbol>
     <symbol id="i-redo" viewBox="0 0 24 24"><path d="m16 4 5 5-5 5M21 9H11a7 7 0 0 0 0 14" transform="translate(0 -2)"/></symbol>
     <symbol id="i-erase" viewBox="0 0 24 24"><path d="m9 5-7 7 7 7h12V5H9Z"/><path d="m12 9 6 6m0-6-6 6"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="m16 3 5 5L8 21H3v-5L16 3Zm-3 3 5 5M3 16l5 5"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
     <symbol id="i-many" viewBox="0 0 24 24"><rect x="4" y="8" width="12" height="12" rx="2"/><path d="M8 4h10a2 2 0 0 1 2 2v10M8 12h4m-2-2v4"/></symbol>
     <symbol id="i-alert" viewBox="0 0 24 24"><path d="m10.4 4-8 14a1.8 1.8 0 0 0 1.6 2h16a1.8 1.8 0 0 0 1.6-2l-8-14a1.8 1.8 0 0 0-3.2 0Z"/><path d="M12 9v4m0 3v.1"/></symbol>
@@ -249,6 +255,7 @@
         <div class="board-toolbar">
           <span id="board-title" class="board-title">Your puzzle</span>
           <div class="board-actions">
+            <button id="pencil-toggle" class="icon-button" aria-label="Pencil mode" aria-pressed="false" aria-controls="number-pad" title="Pencil notes: click to toggle, or hold Ctrl temporarily"><svg aria-hidden="true"><use href="#i-pencil"/></svg></button>
             <button id="undo" class="icon-button" aria-label="Undo" title="Undo (⌘/Ctrl Z)" disabled><svg aria-hidden="true"><use href="#i-undo"/></svg></button>
             <button id="redo" class="icon-button" aria-label="Redo" title="Redo (⌘/Ctrl Shift Z)" disabled><svg aria-hidden="true"><use href="#i-redo"/></svg></button>
             <span class="divider" aria-hidden="true"></span>
@@ -261,8 +268,8 @@
           <div id="sudoku-grid" class="sudoku-grid" role="grid" aria-label="Sudoku puzzle" aria-rowcount="9" aria-colcount="9" aria-describedby="grid-instructions"></div>
         </div>
         <div class="board-footer"><span><strong id="given-count">0</strong> givens <span aria-hidden="true">/</span> 81 cells</span><span id="board-note">Every number you enter is a clue.</span></div>
-        <p id="grid-instructions" class="keyboard-help"><kbd>1–9</kbd> enter <span class="key-separator"></span><kbd>↑ ↓ ← →</kbd> move <span class="key-separator"></span><kbd>Delete</kbd> erase <span class="key-separator"></span><kbd>⌘/Ctrl Z</kbd> undo<br>You can also paste an 81-digit puzzle. Use 0 or . for empty cells.</p>
-        <p id="teaching-instructions" class="keyboard-help" hidden>Step colors match the supporting cells and crossed-out notes.<br>Blue numbers are learned answers. Back to builder returns to your original clues.</p>
+        <p id="grid-instructions" class="keyboard-help"><kbd>1–9</kbd> enter <span class="key-separator"></span><kbd>↑ ↓ ← →</kbd> move <span class="key-separator"></span><kbd>Delete</kbd> erase <span class="key-separator"></span><kbd>⌘/Ctrl Z</kbd> undo<br>Click the pencil to toggle notes. Hold <kbd>Ctrl</kbd> to temporarily switch.<br>You can also paste an 81-digit puzzle. Use 0 or . for empty cells.</p>
+        <p id="teaching-instructions" class="keyboard-help" hidden>Step colors match the supporting cells and crossed-out notes.<br>Click the pencil to practice with your own notes, or hold <kbd>Ctrl</kbd> temporarily.<br>Blue numbers are learned answers. Back to builder returns to your original clues.</p>
       </section>
       <section id="status-panel" class="status-panel" data-state="checking" aria-label="Puzzle analysis" aria-busy="true">
         <div class="panel-heading"><h2>Live check</h2><span class="live-tag"><span class="live-dot"></span>Automatic</span></div>
@@ -276,6 +283,12 @@
         <div class="teach-controls">
           <button id="show-hint" class="solution-toggle" aria-controls="lesson-panel" disabled>Show hint</button>
           <button id="close-teaching" class="text-button" hidden>Back to builder</button>
+        </div>
+        <div id="entry-controls">
+          <div class="entry-heading"><span id="entry-label">Enter a clue</span><output id="selected-coordinate" class="coordinate" aria-label="Selected cell">A1</output></div>
+          <div id="number-pad" class="number-pad" aria-label="Number pad">
+            <button id="erase" class="number-button erase-button" aria-label="Erase selected cell" title="Erase (Backspace, Delete, or 0)"><svg aria-hidden="true"><use href="#i-erase"/></svg><span id="erase-label">Erase</span></button>
+          </div>
         </div>
         <section id="lesson-panel" class="lesson-panel" aria-label="Teaching explanation" hidden>
           <div class="lesson-heading"><span class="eyebrow">Teach me</span><span id="hint-level" class="lesson-level"></span></div>
@@ -296,10 +309,6 @@
           </ol><p>The easiest available rule anywhere in the grid comes first. These are teaching ranks, not a rating of the whole puzzle. A stalled search never presents a guessed value as a deduction.</p><a href="https://hodoku.sourceforge.net/en/techniques.php" target="_blank" rel="noreferrer">Technique reference: HoDoKu</a></details>
         </section>
         <div id="builder-controls">
-        <div class="entry-heading"><span>Enter a clue</span><output id="selected-coordinate" class="coordinate" aria-label="Selected cell">A1</output></div>
-        <div id="number-pad" class="number-pad" aria-label="Number pad">
-          <button id="erase" class="number-button erase-button" aria-label="Erase selected cell" title="Erase (Backspace, Delete, or 0)"><svg aria-hidden="true"><use href="#i-erase"/></svg><span>Erase</span></button>
-        </div>
         <button id="load-example" class="example-button">Try an example puzzle<svg aria-hidden="true"><use href="#i-arrow"/></svg></button>
         <div id="difficulty-controls" role="group" aria-label="Adjust puzzle clues" data-removal-state="unavailable">
           <div class="difficulty-buttons">
@@ -643,12 +652,15 @@
     'use strict';
     const $ = id => document.getElementById(id);
     const STORAGE_KEY = 'sudoku-studio-draft-v1';
+    const NOTES_STORAGE_KEY = 'sudoku-studio-notes-v1';
     const EXAMPLE = '530070000600195000098000060800060003400803001700020006060000280000419005000080079';
     const letters = 'ABCDEFGHI';
     const grid = $('sudoku-grid'), pad = $('number-pad');
     const cells = [], numberButtons = [];
     const units = Array.from({ length: 27 }, () => []);
     let board = Array(81).fill(0), selected = 0;
+    let pencilNotes = Array(81).fill(0), lessonNotes = Array(81).fill(0), lessonStarted = false;
+    let pencilPinned = false, controlHeld = false, controlCommitted = false;
     // Preview values never enter the editable board, history, or saved draft.
     let solution = null, showingSolution = false;
     let teaching = false, currentHint = null, hintStep = 0, hintApplied = false;
@@ -663,6 +675,10 @@
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
       if (Array.isArray(saved) && saved.length === 81 && saved.every(n => Number.isInteger(n) && n >= 0 && n <= 9)) board = saved;
+      const savedNotes = JSON.parse(localStorage.getItem(NOTES_STORAGE_KEY));
+      if (savedNotes?.board === board.join('') && Array.isArray(savedNotes.notes) && savedNotes.notes.length === 81 && savedNotes.notes.every(mask => Number.isInteger(mask) && mask >= 0 && mask <= 511)) {
+        pencilNotes = savedNotes.notes.map((mask, i) => board[i] ? 0 : mask);
+      }
     } catch { saveAvailable = false; }
     if (!saveAvailable) $('save-state').textContent = 'Browser storage unavailable · keep this tab open';
 
@@ -683,7 +699,7 @@
         if (col === 2 || col === 5) cell.classList.add('box-right');
         if (row === 2 || row === 5) cell.classList.add('box-bottom');
         cell.addEventListener('focus', () => { if (selected !== i) selectCell(i, false); });
-        cell.addEventListener('click', () => selectCell(i));
+        bindPress(cell, () => selectCell(i));
         rowElement.append(cell); cells.push(cell);
       }
       grid.append(rowElement);
@@ -692,8 +708,38 @@
       const button = document.createElement('button');
       button.type = 'button'; button.className = 'number-button'; button.textContent = n;
       button.setAttribute('aria-label', `Enter ${n}`);
-      button.addEventListener('click', () => { enter(n); cells[selected].focus({ preventScroll: true }); });
+      bindPress(button, () => { enter(n); cells[selected].focus({ preventScroll: true }); });
       pad.insertBefore(button, $('erase')); numberButtons.push(button);
+    }
+    function pencilActive() { return pencilPinned !== (controlHeld && !controlCommitted); }
+    function personalNotes() { return teaching ? lessonNotes : pencilNotes; }
+    function setControlHeld(held) {
+      if (controlHeld === held) return;
+      controlHeld = held; controlCommitted = false; render();
+    }
+    // macOS sends a context menu for Control-click. Handle that press once,
+    // while leaving ordinary clicks and keyboard button activation intact.
+    function bindPress(element, action) {
+      let handledControlPress = false;
+      element.addEventListener('pointerdown', event => {
+        handledControlPress = false;
+        if (event.button !== 0) return;
+        setControlHeld(event.ctrlKey);
+        if (event.ctrlKey && !element.disabled) {
+          event.preventDefault(); handledControlPress = true; action();
+        }
+      });
+      element.addEventListener('click', event => {
+        if (handledControlPress && event.detail > 0) { handledControlPress = false; return; }
+        handledControlPress = false; action();
+      });
+      element.addEventListener('contextmenu', event => {
+        if (!event.ctrlKey) return;
+        event.preventDefault();
+        if (!handledControlPress && !element.disabled) {
+          setControlHeld(true); handledControlPress = true; action();
+        }
+      });
     }
     function findConflicts() {
       const found = new Set();
@@ -712,15 +758,20 @@
       const row = Math.floor(selected / 9), col = selected % 9;
       const box = Math.floor(row / 3) * 3 + Math.floor(col / 3);
       const displayed = showingSolution && solution ? solution : teaching ? learningBoard() : board;
+      const penciling = pencilActive(), notes = personalNotes();
+      const editableValues = teaching ? learningBoard() : board;
       const unique = $('status-panel').dataset.state === 'unique';
       grid.classList.toggle('showing-solution', showingSolution);
+      grid.classList.toggle('penciling', penciling);
       $('workspace').classList.toggle('teaching', teaching);
       grid.setAttribute('aria-describedby', teaching ? 'teaching-instructions' : 'grid-instructions');
       const activeStep = teaching ? currentHint?.steps[hintStep] : null;
       cells.forEach((cell, i) => {
         const r = Math.floor(i / 9), c = i % 9;
         cell.textContent = displayed[i] || '';
-        if (teaching && !displayed[i] && currentHint?.noteCells?.includes(i)) cell.replaceChildren(pencilGrid(i));
+        const hintNotes = teaching && !penciling && !displayed[i] && currentHint?.noteCells?.includes(i);
+        if (hintNotes) cell.replaceChildren(pencilGrid(i));
+        else if (!displayed[i] && notes[i]) cell.replaceChildren(manualPencilGrid(notes[i]));
         cell.classList.toggle('given-value', board[i] !== 0);
         cell.classList.toggle('learned-value', teaching && learned[i] !== 0);
         cell.classList.toggle('solution-value', showingSolution && board[i] === 0);
@@ -736,19 +787,36 @@
         cell.tabIndex = i === selected ? 0 : -1;
         cell.setAttribute('aria-selected', i === selected ? 'true' : 'false');
         cell.setAttribute('aria-invalid', conflicts.has(i) ? 'true' : 'false');
-        cell.setAttribute('aria-label', `Row ${r + 1}, column ${letters[c]}, ${displayed[i] || 'empty'}${conflicts.has(i) ? ', conflicting given' : board[i] ? ', given' : teaching && learned[i] ? ', learned answer' : showingSolution ? ', solution value' : ''}${teaching && currentHint?.target === i ? ', hint target' : ''}`);
+        const noteLabel = !displayed[i] && !hintNotes && notes[i] ? `, pencil notes ${noteDigits(notes[i]).join(', ')}` : '';
+        cell.setAttribute('aria-label', `Row ${r + 1}, column ${letters[c]}, ${displayed[i] || 'empty'}${conflicts.has(i) ? ', conflicting given' : board[i] ? ', given' : teaching && learned[i] ? ', learned answer' : showingSolution ? ', solution value' : ''}${teaching && currentHint?.target === i ? ', hint target' : ''}${noteLabel}`);
       });
-      numberButtons.forEach((button, i) => button.classList.toggle('current', board[selected] === i + 1));
+      numberButtons.forEach((button, i) => {
+        const marked = Boolean(notes[selected] & (1 << i));
+        button.classList.toggle('current', penciling ? marked : board[selected] === i + 1);
+        button.disabled = penciling && Boolean(editableValues[selected]);
+        button.setAttribute('aria-label', penciling ? `Toggle note ${i + 1}` : `Enter ${i + 1}`);
+        if (penciling) button.setAttribute('aria-pressed', String(marked));
+        else button.removeAttribute('aria-pressed');
+      });
+      $('pencil-toggle').setAttribute('aria-pressed', String(penciling));
+      $('pencil-toggle').dataset.temporary = String(controlHeld && !controlCommitted);
+      $('pencil-toggle').title = controlHeld && !controlCommitted ? `Temporary ${penciling ? 'pencil' : 'number'} mode · click to keep this mode` : `Pencil notes ${penciling ? 'on' : 'off'} · click to toggle, or hold Ctrl temporarily`;
+      $('entry-label').textContent = penciling ? 'Pencil notes · tap to toggle' : 'Enter a clue';
+      $('entry-controls').hidden = teaching && !penciling;
       $('selected-coordinate').textContent = letters[col] + (row + 1);
       const givenCount = board.filter(Boolean).length;
       $('given-count').textContent = givenCount;
       $('undo').disabled = teaching ? !lessonHistory.length : !history.length;
       $('redo').disabled = teaching ? !lessonFuture.length : !future.length;
-      $('clear').disabled = teaching ? !learned.some(Boolean) && !excludedNotes.some(Boolean) : !givenCount;
+      $('clear').disabled = teaching ? !learned.some(Boolean) && !excludedNotes.some(Boolean) && !lessonNotes.some(Boolean) : !givenCount && !pencilNotes.some(Boolean);
       $('clear').textContent = teaching ? 'Reset lesson' : 'Clear grid';
-      $('erase').disabled = !board[selected];
+      const eraseNotes = penciling || !editableValues[selected];
+      $('erase').disabled = eraseNotes ? !notes[selected] || Boolean(editableValues[selected]) : !board[selected];
+      $('erase').setAttribute('aria-label', penciling ? 'Erase pencil notes' : 'Erase selected cell');
+      $('erase-label').textContent = penciling ? 'Clear notes' : 'Erase';
       $('board-title').textContent = showingSolution ? unique ? 'The solution' : 'A possible solution' : teaching ? 'Learning board' : 'Your puzzle';
       $('board-note').textContent = showingSolution ? 'Bold: your clues · Light: solution' : teaching ? `${learned.filter(Boolean).length} learned · Original clues preserved` : 'Every number you enter is a clue.';
+      if (penciling && !showingSolution) $('board-note').textContent = editableValues[selected] ? 'Select an empty cell to pencil in notes.' : teaching ? 'Your pencil notes · Hints use their own notes' : 'Pencil mode · 1–9 toggles your notes';
       $('solution-toggle').disabled = !solution;
       $('solution-toggle').setAttribute('aria-pressed', String(showingSolution));
       $('solution-toggle-label').textContent = showingSolution ? 'Hide solution' : solution ? unique ? 'Show the solution' : 'Show a possible solution' : 'Show solution';
@@ -779,6 +847,16 @@
       if (teaching) renderLesson();
     }
     function learningBoard() { return board.map((value, i) => value || learned[i]); }
+    function noteDigits(mask) { return Array.from({ length: 9 }, (_, i) => i + 1).filter(n => mask & (1 << (n - 1))); }
+    function manualPencilGrid(mask) {
+      const element = document.createElement('span'); element.className = 'pencil-grid manual-notes';
+      element.setAttribute('aria-hidden', 'true');
+      for (let n = 1; n <= 9; n++) {
+        const note = document.createElement('span'); note.className = 'pencil-note'; note.dataset.digit = n;
+        note.textContent = mask & (1 << (n - 1)) ? n : ''; element.append(note);
+      }
+      return element;
+    }
     function pencilNote(index, digit) {
       const element = document.createElement('span'), mask = 1 << (digit - 1);
       element.className = 'pencil-note'; element.dataset.digit = digit;
@@ -839,21 +917,23 @@
     }
     function requestHint() {
       if (!solution) return;
+      if (!lessonStarted) { lessonNotes = pencilNotes.slice(); lessonStarted = true; }
       teaching = true; showingSolution = false; hintStep = 0; hintApplied = false;
       currentHint = SudokuHints.next(learningBoard(), excludedNotes);
       if (currentHint.target !== undefined) selected = currentHint.target;
       render();
     }
-    function lessonSnapshot() { return { learned: learned.slice(), excluded: excludedNotes.slice() }; }
+    function lessonSnapshot() { return { learned: learned.slice(), excluded: excludedNotes.slice(), notes: lessonNotes.slice(), selected }; }
     function rememberLesson() { lessonHistory.push(lessonSnapshot()); if (lessonHistory.length > 900) lessonHistory.shift(); lessonFuture = []; }
     function restoreLesson(snapshot) {
-      learned = snapshot.learned; excludedNotes = snapshot.excluded;
+      learned = snapshot.learned; excludedNotes = snapshot.excluded; lessonNotes = snapshot.notes;
+      selected = snapshot.selected ?? selected;
       currentHint = null; hintApplied = false; hintStep = 0; render();
     }
     function applyHint() {
       if (!currentHint || hintApplied || hintStep !== currentHint.steps.length - 1 || !['placement', 'elimination'].includes(currentHint.type)) return;
       rememberLesson();
-      if (currentHint.type === 'placement') learned[currentHint.target] = currentHint.value;
+      if (currentHint.type === 'placement') { learned[currentHint.target] = currentHint.value; lessonNotes[currentHint.target] = 0; }
       else for (const { index, mask } of currentHint.remove) excludedNotes[index] |= mask;
       hintApplied = true; render();
     }
@@ -867,7 +947,7 @@
       $('save-state').textContent = 'Saving draft…';
       saveTimer = setTimeout(() => {
         try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(board));
+          persistDraft();
           $('save-state').textContent = 'Draft saved in this browser';
         } catch {
           saveAvailable = false;
@@ -875,29 +955,61 @@
         }
       }, 150);
     }
+    function persistDraft() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(board));
+      // Bind marks to their givens so an older or partial save cannot attach
+      // notes to a different puzzle. Existing drafts keep their original format.
+      localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify({ board: board.join(''), notes: pencilNotes }));
+    }
     function changed() {
       teaching = false; currentHint = null; hintApplied = false;
+      lessonNotes = Array(81).fill(0); lessonStarted = false;
       learned = Array(81).fill(0); excludedNotes = Array(81).fill(0); lessonHistory = []; lessonFuture = [];
       conflicts = findConflicts(); saveDraft(); queueCheck();
     }
-    function commit(next, nextSelected = selected) {
+    function builderSnapshot() { return { board: board.slice(), notes: pencilNotes.slice(), selected }; }
+    function commit(next, nextSelected = selected, nextNotes = pencilNotes.map((mask, i) => next[i] ? 0 : mask)) {
       if (showingSolution) { showingSolution = false; render(); }
-      if (next.every((value, i) => value === board[i])) return;
-      history.push({ board: board.slice(), selected });
+      const boardChanged = next.some((value, i) => value !== board[i]);
+      if (!boardChanged && nextNotes.every((mask, i) => mask === pencilNotes[i])) return;
+      history.push(builderSnapshot());
       if (history.length > 500) history.shift();
-      future = []; board = next; selected = nextSelected;
-      changed();
+      future = []; board = next; pencilNotes = nextNotes; selected = nextSelected;
+      if (boardChanged) changed();
+      else { saveDraft(); render(); }
     }
-    function enter(value) { const next = board.slice(); next[selected] = value; commit(next); }
+    function editPencilNotes(value) {
+      if ((teaching ? learningBoard() : board)[selected]) { toast('Pencil notes go in an empty cell.'); return; }
+      const notes = personalNotes(), nextMask = value ? notes[selected] ^ (1 << (value - 1)) : 0;
+      if (notes[selected] === nextMask) return;
+      showingSolution = false;
+      if (teaching) {
+        rememberLesson(); lessonNotes[selected] = nextMask; render();
+      } else {
+        const nextNotes = pencilNotes.slice(); nextNotes[selected] = nextMask;
+        commit(board.slice(), selected, nextNotes);
+      }
+    }
+    function enter(value) {
+      if (pencilActive()) { editPencilNotes(value); return; }
+      if (teaching) { toast('Turn on the pencil to practice notes, or use Apply hint to place a number.'); return; }
+      if (!value && !board[selected] && pencilNotes[selected]) { editPencilNotes(0); return; }
+      const next = board.slice(); next[selected] = value; commit(next);
+    }
+    function restoreBuilder(snapshot) {
+      const boardChanged = snapshot.board.some((value, i) => value !== board[i]);
+      board = snapshot.board; pencilNotes = snapshot.notes; selected = snapshot.selected;
+      showingSolution = false;
+      if (boardChanged) changed();
+      else { saveDraft(); render(); }
+    }
     function undo() {
       if (teaching) {
         if (lessonHistory.length) { lessonFuture.push(lessonSnapshot()); restoreLesson(lessonHistory.pop()); }
         return;
       }
       if (!history.length) return;
-      future.push({ board: board.slice(), selected });
-      const previous = history.pop(); board = previous.board; selected = previous.selected;
-      changed();
+      future.push(builderSnapshot()); restoreBuilder(history.pop());
     }
     function redo() {
       if (teaching) {
@@ -905,9 +1017,7 @@
         return;
       }
       if (!future.length) return;
-      history.push({ board: board.slice(), selected });
-      const next = future.pop(); board = next.board; selected = next.selected;
-      changed();
+      history.push(builderSnapshot()); restoreBuilder(future.pop());
     }
     function toast(message) {
       clearTimeout(toastTimer); $('toast').textContent = message; $('toast').hidden = false;
@@ -1003,16 +1113,21 @@
     }
     $('undo').addEventListener('click', () => { undo(); cells[selected].focus({ preventScroll: true }); });
     $('redo').addEventListener('click', () => { redo(); cells[selected].focus({ preventScroll: true }); });
-    $('erase').addEventListener('click', () => { enter(0); cells[selected].focus({ preventScroll: true }); });
+    bindPress($('erase'), () => { enter(0); cells[selected].focus({ preventScroll: true }); });
+    bindPress($('pencil-toggle'), () => {
+      if (controlHeld && !controlCommitted) { pencilPinned = pencilActive(); controlCommitted = true; }
+      else pencilPinned = !pencilPinned;
+      render(); cells[selected].focus({ preventScroll: true });
+    });
     $('clear').addEventListener('click', () => {
       if (teaching) {
-        rememberLesson(); restoreLesson({ learned: Array(81).fill(0), excluded: Array(81).fill(0) });
+        rememberLesson(); restoreLesson({ learned: Array(81).fill(0), excluded: Array(81).fill(0), notes: Array(81).fill(0) });
         toast('Lesson reset. Your original clues are preserved.'); return;
       }
-      commit(Array(81).fill(0), 0); cells[selected].focus({ preventScroll: true }); toast('Grid cleared. Undo brings it back.');
+      commit(Array(81).fill(0), 0, Array(81).fill(0)); cells[selected].focus({ preventScroll: true }); toast('Grid cleared. Undo brings it back.');
     });
     $('load-example').addEventListener('click', () => {
-      commit(Array.from(EXAMPLE, Number), 2); cells[selected].focus({ preventScroll: true }); toast('Example loaded. Every clue is editable.');
+      commit(Array.from(EXAMPLE, Number), 2, Array(81).fill(0)); cells[selected].focus({ preventScroll: true }); toast('Example loaded. Every clue is editable.');
     });
     $('retry-check').addEventListener('click', () => queueCheck(60000));
     $('retry-removal').addEventListener('click', () => queueCheck(60000));
@@ -1044,7 +1159,9 @@
     $('next-step').addEventListener('click', () => { if (currentHint && hintStep < currentHint.steps.length - 1 && !hintApplied) { hintStep++; render(); } });
     $('apply-hint').addEventListener('click', applyHint);
     document.addEventListener('keydown', event => {
+      if (event.key === 'Control') { setControlHeld(true); return; }
       if (event.isComposing || event.altKey) return;
+      setControlHeld(event.ctrlKey);
       const modifier = event.ctrlKey || event.metaKey;
       if (modifier && event.key.toLowerCase() === 'z') {
         event.preventDefault(); event.shiftKey ? redo() : undo(); cells[selected].focus({ preventScroll: true }); return;
@@ -1052,12 +1169,9 @@
       if (modifier && event.key.toLowerCase() === 'y') {
         event.preventDefault(); redo(); cells[selected].focus({ preventScroll: true }); return;
       }
-      if (modifier) return;
+      if (event.metaKey) return;
       const inEditor = grid.contains(event.target) || pad.contains(event.target) || event.target === document.body;
       if (!inEditor) return;
-      if (teaching && (/^[1-9]$/.test(event.key) || ['Backspace', 'Delete', '0', '.'].includes(event.key))) {
-        event.preventDefault(); toast('Use Apply hint to learn, or Back to builder to edit your clues.'); return;
-      }
       if (/^[1-9]$/.test(event.key)) { event.preventDefault(); enter(Number(event.key)); cells[selected].focus({ preventScroll: true }); }
       else if (['Backspace', 'Delete', '0', '.'].includes(event.key)) { event.preventDefault(); enter(0); cells[selected].focus({ preventScroll: true }); }
       else {
@@ -1066,18 +1180,21 @@
         if (Object.hasOwn(moves, event.key)) { event.preventDefault(); selectCell(moves[event.key]); }
       }
     });
+    document.addEventListener('keyup', event => { if (event.key === 'Control') setControlHeld(event.ctrlKey); });
+    window.addEventListener('blur', () => setControlHeld(false));
+    document.addEventListener('visibilitychange', () => { if (document.hidden) setControlHeld(false); });
     // A pasted 81-character grid is one undoable edit. Dots and zeros are blanks.
     grid.addEventListener('paste', event => {
       if (teaching) { event.preventDefault(); toast('Return to the builder before pasting a new puzzle.'); return; }
       const text = event.clipboardData?.getData('text/plain').replace(/\s/g, '') || '';
       if (text.length === 1 && /^[1-9]$/.test(text)) { event.preventDefault(); enter(Number(text)); return; }
       if (text.length === 81 && /^[0-9.]+$/.test(text)) {
-        event.preventDefault(); commit(Array.from(text, c => c === '.' ? 0 : Number(c)), 0);
+        event.preventDefault(); commit(Array.from(text, c => c === '.' ? 0 : Number(c)), 0, Array(81).fill(0));
         cells[selected].focus({ preventScroll: true }); toast('Puzzle pasted. Undo brings back your previous grid.');
       } else if (text) { event.preventDefault(); toast('Paste 81 digits, using 0 or . for empty cells.'); }
     });
     window.addEventListener('pagehide', () => {
-      if (saveAvailable) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(board)); } catch {} }
+      if (saveAvailable) { try { persistDraft(); } catch {} }
     });
     conflicts = findConflicts(); render(); queueCheck();
   })();
