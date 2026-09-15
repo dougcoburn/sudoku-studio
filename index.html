@@ -1,0 +1,1086 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#f6f5f0">
+  <title>Sudoku Studio — Puzzle Builder</title>
+  <style>
+    :root {
+      --paper: #f6f5f0; --surface: #fffefa; --ink: #233d33; --muted: #6a756b;
+      --line: #dedfd5; --green: #315b43; --green-soft: #e8eee3;
+      --amber: #96662b; --amber-soft: #fcf4e4; --red: #ac423a; --red-soft: #fcebe5;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+    button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
+    button:disabled { cursor: default; opacity: .35; }
+    button:focus-visible, summary:focus-visible { outline: 3px solid #789b61; outline-offset: 4px; }
+    svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+    .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+    .shell { max-width: 964px; margin: auto; padding: 24px 32px 20px; }
+    .masthead { display: flex; align-items: center; justify-content: space-between; padding-bottom: 19px; border-bottom: 1px solid var(--line); }
+    .brand { display: flex; align-items: center; gap: 11px; font-size: 18px; font-weight: 650; letter-spacing: -.5px; }
+    .brand-mark { width: 30px; height: 30px; color: var(--green); }
+    .local-note { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
+    .local-note svg { width: 15px; height: 15px; }
+    .intro { margin: 24px 0 22px; }
+    .eyebrow { font-size: 10px; text-transform: uppercase; font-weight: 700; letter-spacing: 1.8px; color: var(--muted); }
+    h1 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; font-size: clamp(30px, 4vw, 40px); letter-spacing: -1.3px; margin: 10px 0; line-height: 1.15; }
+    .intro p { font-size: 14px; color: var(--muted); margin: 0; line-height: 1.6; }
+    .workspace { display: grid; grid-template-columns: minmax(0, 1fr) 278px; grid-template-rows: auto 1fr; grid-template-areas: "board status" "board input"; gap: 18px 30px; align-items: start; }
+    .board-section { grid-area: board; min-width: 0; }
+    .board-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; min-height: 40px; margin: 0 0 10px 22px; }
+    .board-title { font-size: 14px; font-weight: 650; white-space: nowrap; }
+    .board-actions { display: flex; align-items: center; gap: 3px; }
+    .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; background: transparent; border: 0; border-radius: 6px; }
+    .icon-button:hover:enabled { background: var(--green-soft); }
+    .divider { height: 17px; width: 1px; background: var(--line); margin: 0 7px; }
+    .text-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 6px 9px; border: 0; background: transparent; border-radius: 6px; color: var(--muted); font-size: 12px; }
+    .text-button:hover:enabled { background: var(--green-soft); color: var(--ink); }
+    .text-button svg { width: 16px; height: 16px; }
+    .board-frame { display: grid; grid-template-columns: 22px minmax(0, 1fr); grid-template-rows: 21px auto; }
+    .column-labels { grid-column: 2; display: grid; grid-template-columns: repeat(9, 1fr); padding: 0 2px; }
+    .row-labels { grid-row: 2; display: grid; grid-template-rows: repeat(9, 1fr); padding: 2px 0; }
+    .column-labels span, .row-labels span { display: flex; align-items: center; justify-content: center; color: #899183; font-size: 10px; font-weight: 600; }
+    .column-labels span { align-items: start; }
+    .sudoku-grid { grid-column: 2; grid-row: 2; display: grid; grid-template-rows: repeat(9, 1fr); aspect-ratio: 1; border: 2px solid #546653; background: var(--surface); border-radius: 3px; overflow: hidden; box-shadow: 0 5px 16px #233d3306; }
+    .grid-row { display: grid; grid-template-columns: repeat(9, 1fr); min-height: 0; }
+    .cell { position: relative; border: 0; border-right: 1px solid #d8ddd1; border-bottom: 1px solid #d8ddd1; padding: 0; min-width: 0; min-height: 0; background: transparent; border-radius: 0; font-size: clamp(21px, 3.2vw, 31px); font-weight: 500; font-variant-numeric: tabular-nums; transition: background-color 90ms; user-select: none; }
+    .cell.box-right { border-right: 2px solid #72816b; }
+    .cell.box-bottom { border-bottom: 2px solid #72816b; }
+    .cell:last-child { border-right: 0; }
+    .grid-row:last-child .cell { border-bottom: 0; }
+    .cell.peer { background: #f0f3ec; }
+    .cell.same-value { background: #e3ebda; color: #284727; }
+    .sudoku-grid.showing-solution .cell.given-value { font-weight: 700; }
+    .cell.solution-value { color: #627c6a; font-weight: 350; }
+    .cell:hover { background: #e8eede; }
+    .cell.conflict { background: var(--red-soft); color: var(--red); }
+    .cell.conflict::after { content: ""; position: absolute; width: 5px; height: 5px; border-radius: 50%; background: var(--red); top: 6px; right: 6px; }
+    .cell.selected { background: #dce9d2; box-shadow: inset 0 0 0 2px #3d684b; z-index: 1; }
+    .cell.selected.conflict { background: #f6dcd1; box-shadow: inset 0 0 0 2px var(--red); }
+    .cell:focus-visible { outline: none; box-shadow: inset 0 0 0 3px #3d684b; }
+    .board-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 14px; margin: 16px 0 0 22px; font-size: 12px; color: var(--muted); }
+    .board-footer strong { color: var(--ink); font-weight: 650; }
+    .keyboard-help { margin: 22px 0 0 22px; color: var(--muted); font-size: 11px; line-height: 1.9; }
+    kbd { font: inherit; display: inline-block; border: 1px solid #dbded3; border-radius: 4px; padding: 0 5px; background: #fdfcf7; line-height: 1.7; color: #5a6859; }
+    .key-separator { display: inline-block; width: 12px; }
+    .status-panel { grid-area: status; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 21px; margin-top: 2px; }
+    .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .panel-heading h2 { font-size: 13px; font-weight: 650; margin: 0; }
+    .live-tag { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 10px; }
+    .live-dot { height: 5px; width: 5px; background: #78976c; border-radius: 50%; }
+    .status-icon { display: flex; align-items: center; justify-content: center; height: 40px; width: 40px; margin-top: 21px; border-radius: 50%; color: var(--amber); background: var(--amber-soft); }
+    .status-icon svg { width: 23px; height: 23px; }
+    .status-panel[data-state="unique"] .status-icon { color: var(--green); background: var(--green-soft); }
+    .status-panel[data-state="conflict"] .status-icon, .status-panel[data-state="none"] .status-icon { color: var(--red); background: var(--red-soft); }
+    .status-panel[data-state="checking"] .status-icon, .status-panel[data-state="error"] .status-icon { color: var(--muted); background: #f0f0ea; }
+    .status-panel[data-state="checking"] .status-icon svg { animation: rotate 1.4s linear infinite; }
+    @keyframes rotate { to { transform: rotate(360deg); } }
+    .status-title { font-family: Georgia, "Times New Roman", serif; font-size: 24px; font-weight: 400; letter-spacing: -.6px; margin: 14px 0 8px; }
+    .status-description { min-height: 55px; font-size: 12px; line-height: 1.65; color: var(--muted); margin: 0; }
+    .check-time { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; margin-top: 20px; min-height: 28px; font-variant-numeric: tabular-nums; }
+    .check-time svg { width: 13px; height: 13px; }
+    .solution-toggle { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 38px; margin-top: 12px; padding: 8px 10px; border: 1px solid #d4ddca; border-radius: 7px; background: #edf2e6; color: var(--green); font-size: 12px; }
+    .solution-toggle svg { width: 17px; height: 17px; }
+    .solution-toggle:hover:enabled { background: #e0ebd5; }
+    .solution-toggle[aria-pressed="true"] { background: var(--green); border-color: var(--green); color: var(--surface); }
+    .solution-toggle[aria-pressed="true"]:hover { background: #264b36; }
+    #retry-check { margin-top: 10px; }
+    [hidden] { display: none !important; }
+    .entry-panel { grid-area: input; padding: 2px 0 0; }
+    .entry-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 12px; }
+    .entry-heading span { color: var(--muted); }
+    .coordinate { background: #e9ecdf; border: 1px solid #dce1d0; font-variant-numeric: tabular-nums; border-radius: 5px; font-size: 11px; font-weight: 600; padding: 4px 8px; }
+    .number-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .number-button { height: 51px; border: 1px solid #daddd1; border-radius: 7px; background: var(--surface); font-size: 23px; font-weight: 500; box-shadow: 0 2px 0 #263d3210; }
+    .number-button:hover { background: var(--green-soft); border-color: #aebea3; }
+    .number-button:active { transform: translateY(1px); box-shadow: none; }
+    .number-button.current { color: var(--green); background: #e5eddd; border-color: #89a476; }
+    .erase-button { grid-column: 1 / -1; height: 38px; display: flex; align-items: center; justify-content: center; gap: 7px; font-size: 12px; color: var(--muted); }
+    .erase-button svg { width: 17px; height: 17px; }
+    .example-button { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; border: 0; border-radius: 6px; min-height: 42px; background: transparent; color: var(--green); font-size: 12px; margin-top: 12px; }
+    .example-button:hover { background: var(--green-soft); }
+    .example-button svg { width: 16px; height: 16px; }
+    .difficulty-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+    .difficulty-button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; padding: 8px; border: 1px solid #daddd1; border-radius: 7px; background: var(--surface); color: var(--green); font-size: 12px; }
+    .difficulty-button:hover:enabled { background: var(--green-soft); border-color: #aebea3; }
+    .difficulty-button svg { width: 15px; height: 15px; }
+    .difficulty-note { margin: 8px 0 0; min-height: 30px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+    #retry-removal { padding-left: 0; font-size: 11px; }
+    .teach-controls { display: flex; gap: 8px; margin-bottom: 14px; }
+    .teach-controls .solution-toggle { margin: 0; flex: 1; }
+    #close-teaching { font-size: 11px; padding: 5px 0 5px 5px; }
+    .lesson-panel { border: 1px solid #d7dfd1; border-radius: 12px; background: var(--surface); padding: 18px; }
+    .lesson-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .lesson-level { font-size: 10px; padding: 4px 7px; border-radius: 4px; background: #e9eee2; color: var(--green); }
+    .lesson-panel h2 { margin: 14px 0 8px; font-family: Georgia, serif; font-size: 23px; font-weight: 400; letter-spacing: -.4px; }
+    .lesson-focus { color: var(--muted); font-size: 11px; margin: 0 0 15px; line-height: 1.5; }
+    .hint-steps { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 13px; }
+    .hint-step-button { border: 1px solid #dce0d6; border-radius: 5px; min-width: 33px; min-height: 32px; background: var(--surface); font-size: 12px; color: var(--step-color); }
+    .hint-step-button[aria-current="step"] { border: 2px solid var(--step-color); background: var(--step-bg); font-weight: 700; }
+    .color-row { --step-color: #276b9d; --step-bg: #e7f0f9; }
+    .color-column { --step-color: #91600f; --step-bg: #fbf0d9; }
+    .color-box { --step-color: #795097; --step-bg: #f0e7f7; }
+    .color-pattern { --step-color: #236f67; --step-bg: #e4f1ed; }
+    .color-result { --step-color: #a54237; --step-bg: #fbe9e4; }
+    .hint-message { border-left: 3px solid var(--step-color); padding: 10px 12px; background: var(--step-bg); border-radius: 0 6px 6px 0; }
+    .hint-message h3 { margin: 0 0 6px; font-size: 12px; color: var(--step-color); line-height: 1.5; }
+    .hint-message p { font-size: 12px; line-height: 1.65; margin: 0; color: #37483b; overflow-wrap: anywhere; }
+    .hint-notes-label { font-size: 10px; color: var(--muted); margin: 15px 0 7px; }
+    .hint-notes { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 3px; }
+    .hint-notes .pencil-note { font-size: 13px; min-height: 27px; border-radius: 4px; background: #f0f3ec; }
+    .pencil-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); height: 100%; width: 100%; padding: 3px; }
+    .pencil-note { display: flex; align-items: center; justify-content: center; font-size: clamp(9px, 1.2vw, 12px); font-weight: 500; line-height: 1; color: #54644f; }
+    .pencil-note.cut { color: var(--step-color); background: var(--step-bg); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+    .pencil-note.kept { color: #204b32; background: #dcebcf; border-radius: 3px; font-weight: 750; }
+    .cell.hint-support { background: var(--step-bg); box-shadow: inset 0 0 0 1px var(--step-color); }
+    .cell.hint-target { box-shadow: inset 0 0 0 3px #315b43; z-index: 2; }
+    .cell.learned-value { color: #326b93; font-weight: 450; }
+    .teaching .cell.given-value { font-weight: 700; }
+    .hint-conclusion { font-size: 12px; line-height: 1.6; color: var(--green); margin: 13px 0; }
+    .hint-navigation { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; }
+    #apply-hint { margin-top: 10px; }
+    .technique-order { margin-top: 17px; color: var(--muted); font-size: 10px; line-height: 1.65; }
+    .technique-order summary { cursor: pointer; }
+    .technique-order ol { margin: 9px 0; padding-left: 17px; }
+    .technique-order a { color: var(--green); }
+    .workspace.teaching .status-panel { padding: 15px; }
+    .workspace.teaching .status-panel .panel-heading, .workspace.teaching .status-icon, .workspace.teaching .status-description, .workspace.teaching .check-time { display: none; }
+    .workspace.teaching .status-title { margin: 0; font-size: 20px; }
+    .page-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; border-top: 1px solid var(--line); margin-top: 34px; padding-top: 18px; color: #858c80; font-size: 10px; letter-spacing: .2px; }
+    .save-state { display: inline-flex; align-items: center; gap: 5px; }
+    .save-state svg { width: 13px; height: 13px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+    .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 12px 18px; border-radius: 9px; background: var(--ink); color: white; font-size: 13px; box-shadow: 0 4px 20px #0002; z-index: 5; pointer-events: none; }
+    @media (min-width: 801px) and (max-height: 900px) {
+      .shell { max-width: 906px; padding-top: 18px; }
+      .masthead { padding-bottom: 15px; }
+      .intro { margin: 19px 0 17px; }
+      h1 { font-size: 33px; margin: 8px 0; }
+      .workspace { row-gap: 16px; }
+      .status-panel { padding: 16px; }
+      .status-icon { margin-top: 12px; width: 30px; height: 30px; }
+      .status-title { margin: 8px 0 5px; }
+      .status-description { min-height: 45px; line-height: 1.5; }
+      .check-time { margin-top: 8px; padding-top: 8px; }
+      .status-panel .solution-toggle { margin-top: 10px; }
+      .teach-controls { margin-bottom: 10px; }
+      .entry-heading { margin-bottom: 10px; }
+      .number-button { height: 45px; }
+      .erase-button { height: 34px; }
+      .example-button { margin-top: 8px; }
+      .keyboard-help { margin-top: 14px; }
+      .page-footer { margin-top: 23px; }
+    }
+    @media (max-width: 800px) {
+      .shell { max-width: 660px; padding: 22px 22px 24px; }
+      .workspace { grid-template-columns: 1fr; grid-template-rows: auto; grid-template-areas: "status" "board" "input"; gap: 22px; }
+      .status-panel { display: grid; grid-template-columns: 35px 1fr; gap: 0 13px; padding: 16px 18px; }
+      .panel-heading { grid-column: 1 / -1; margin-bottom: 13px; }
+      .status-icon { margin: 0; width: 35px; height: 35px; grid-column: 1; grid-row: 2 / 4; }
+      .status-icon svg { width: 20px; height: 20px; }
+      .status-copy { grid-column: 2; }
+      .status-title { font-size: 21px; margin: 0 0 5px; }
+      .status-description { min-height: 0; font-size: 12px; }
+      .check-time { grid-column: 2; border: 0; margin: 8px 0 0; padding: 0; min-height: 0; }
+      .solution-toggle { grid-column: 1 / -1; }
+      #retry-check { grid-column: 2; justify-self: start; }
+      .number-pad { grid-template-columns: repeat(5, 1fr); }
+      .erase-button { grid-column: auto; height: 51px; flex-direction: column; gap: 0; font-size: 10px; }
+      .entry-panel { margin-left: 22px; }
+      .cell { font-size: clamp(22px, 5.2vw, 34px); }
+      .workspace.teaching { grid-template-areas: "status" "board" "input"; }
+      .workspace.teaching .status-panel { display: block; }
+      .pencil-grid { padding: 2px; }
+      .pencil-note { font-size: clamp(8px, 2.6vw, 12px); }
+      .intro { margin: 25px 0 23px; }
+      .keyboard-help { display: none; }
+      .page-footer { margin-top: 24px; }
+    }
+    @media (max-width: 420px) {
+      .shell { padding: 19px 16px; }
+      .masthead { padding-bottom: 20px; }
+      .local-note span { display: none; }
+      h1 { font-size: 31px; }
+      .intro p { max-width: 285px; font-size: 13px; }
+      .board-toolbar { margin-left: 18px; }
+      .board-frame { grid-template-columns: 18px minmax(0, 1fr); }
+      .board-footer, .entry-panel { margin-left: 18px; }
+      .board-footer { font-size: 11px; }
+      .number-pad { gap: 6px; }
+      .status-description { font-size: 11px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  </style>
+</head>
+<body>
+  <svg class="sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/><path d="M9 3h6v6H9z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="m8 4-5 5 5 5M3 9h10a7 7 0 0 1 0 14" transform="translate(0 -2)"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="m16 4 5 5-5 5M21 9H11a7 7 0 0 0 0 14" transform="translate(0 -2)"/></symbol>
+    <symbol id="i-erase" viewBox="0 0 24 24"><path d="m9 5-7 7 7 7h12V5H9Z"/><path d="m12 9 6 6m0-6-6 6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-many" viewBox="0 0 24 24"><rect x="4" y="8" width="12" height="12" rx="2"/><path d="M8 4h10a2 2 0 0 1 2 2v10M8 12h4m-2-2v4"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="m10.4 4-8 14a1.8 1.8 0 0 0 1.6 2h16a1.8 1.8 0 0 0 1.6-2l-8-14a1.8 1.8 0 0 0-3.2 0Z"/><path d="M12 9v4m0 3v.1"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-loader" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="m3 3 18 18M10 5.2A11 11 0 0 1 12 5c6.5 0 10 7 10 7a18 18 0 0 1-3 3.8M6 6.5A20 20 0 0 0 2 12s3.5 7 10 7a12 12 0 0 0 5-1.2M10 10a3 3 0 0 0 4 4"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+  </svg>
+  <div class="shell">
+    <header class="masthead">
+      <div class="brand"><svg class="brand-mark" aria-hidden="true"><use href="#i-grid"/></svg>Sudoku Studio</div>
+      <div class="local-note"><svg aria-hidden="true"><use href="#i-lock"/></svg><span>Just you and the numbers</span></div>
+    </header>
+    <section class="intro">
+      <div class="eyebrow">The puzzle builder</div>
+      <h1>A good puzzle starts with a clue.</h1>
+      <p>Place your numbers. We’ll check that there’s exactly one way to finish.</p>
+    </section>
+    <main id="workspace" class="workspace">
+      <section class="board-section" aria-label="Puzzle editor">
+        <div class="board-toolbar">
+          <span id="board-title" class="board-title">Your puzzle</span>
+          <div class="board-actions">
+            <button id="undo" class="icon-button" aria-label="Undo" title="Undo (⌘/Ctrl Z)" disabled><svg aria-hidden="true"><use href="#i-undo"/></svg></button>
+            <button id="redo" class="icon-button" aria-label="Redo" title="Redo (⌘/Ctrl Shift Z)" disabled><svg aria-hidden="true"><use href="#i-redo"/></svg></button>
+            <span class="divider" aria-hidden="true"></span>
+            <button id="clear" class="text-button" disabled>Clear grid</button>
+          </div>
+        </div>
+        <div class="board-frame">
+          <div id="column-labels" class="column-labels" aria-hidden="true"></div>
+          <div id="row-labels" class="row-labels" aria-hidden="true"></div>
+          <div id="sudoku-grid" class="sudoku-grid" role="grid" aria-label="Sudoku puzzle" aria-rowcount="9" aria-colcount="9" aria-describedby="grid-instructions"></div>
+        </div>
+        <div class="board-footer"><span><strong id="given-count">0</strong> givens <span aria-hidden="true">/</span> 81 cells</span><span id="board-note">Every number you enter is a clue.</span></div>
+        <p id="grid-instructions" class="keyboard-help"><kbd>1–9</kbd> enter <span class="key-separator"></span><kbd>↑ ↓ ← →</kbd> move <span class="key-separator"></span><kbd>Delete</kbd> erase <span class="key-separator"></span><kbd>⌘/Ctrl Z</kbd> undo<br>You can also paste an 81-digit puzzle. Use 0 or . for empty cells.</p>
+        <p id="teaching-instructions" class="keyboard-help" hidden>Step colors match the supporting cells and crossed-out notes.<br>Blue numbers are learned answers. Back to builder returns to your original clues.</p>
+      </section>
+      <section id="status-panel" class="status-panel" data-state="checking" aria-label="Puzzle analysis" aria-busy="true">
+        <div class="panel-heading"><h2>Live check</h2><span class="live-tag"><span class="live-dot"></span>Automatic</span></div>
+        <div class="status-icon" aria-hidden="true"><svg><use id="status-icon" href="#i-loader"/></svg></div>
+        <div class="status-copy" role="status" aria-live="polite" aria-atomic="true"><h3 id="status-title" class="status-title">Checking…</h3><p id="status-description" class="status-description">Looking for possible solutions.</p></div>
+        <div class="check-time"><svg aria-hidden="true"><use href="#i-clock"/></svg><span id="check-time">Checking in the background</span></div>
+        <button id="solution-toggle" class="solution-toggle" aria-pressed="false" aria-controls="sudoku-grid" disabled><svg aria-hidden="true"><use id="solution-toggle-icon" href="#i-eye"/></svg><span id="solution-toggle-label">Show solution</span></button>
+        <button id="retry-check" class="text-button" hidden>Check again</button>
+      </section>
+      <section class="entry-panel" aria-label="Number entry">
+        <div class="teach-controls">
+          <button id="show-hint" class="solution-toggle" aria-controls="lesson-panel" disabled>Show hint</button>
+          <button id="close-teaching" class="text-button" hidden>Back to builder</button>
+        </div>
+        <section id="lesson-panel" class="lesson-panel" aria-label="Teaching explanation" hidden>
+          <div class="lesson-heading"><span class="eyebrow">Teach me</span><span id="hint-level" class="lesson-level"></span></div>
+          <h2 id="hint-title">One deduction at a time</h2>
+          <p id="hint-focus" class="lesson-focus"></p>
+          <div id="hint-steps" class="hint-steps" role="group" aria-label="Explanation steps"></div>
+          <div id="hint-message" class="hint-message color-pattern" role="status" aria-live="polite" aria-atomic="true"><h3 id="hint-step-title"></h3><p id="hint-explanation"></p></div>
+          <div id="hint-notes-section"><p id="hint-notes-label" class="hint-notes-label"></p><div id="hint-notes" class="hint-notes" aria-label="Candidate notes for the target cell"></div></div>
+          <p id="hint-conclusion" class="hint-conclusion"></p>
+          <div id="hint-navigation" class="hint-navigation"><button id="previous-step" class="text-button">← Previous</button><button id="next-step" class="text-button">Next step →</button></div>
+          <button id="apply-hint" class="solution-toggle" disabled>Apply hint</button>
+          <details class="technique-order"><summary>How hints are ranked</summary><ol>
+            <li>Novice: row alone → column alone → 3 × 3 box alone.</li>
+            <li>Beginner: two regions → all three → earlier eliminations → hidden singles.</li>
+            <li>Intermediate: locked candidates → naked pairs → hidden pairs.</li>
+            <li>Advanced: naked triples → hidden triples → X-Wing.</li>
+            <li>Expert: XY-Wing → Swordfish.</li>
+          </ol><p>The easiest available rule anywhere in the grid comes first. These are teaching ranks, not a rating of the whole puzzle. A stalled search never presents a guessed value as a deduction.</p><a href="https://hodoku.sourceforge.net/en/techniques.php" target="_blank" rel="noreferrer">Technique reference: HoDoKu</a></details>
+        </section>
+        <div id="builder-controls">
+        <div class="entry-heading"><span>Enter a clue</span><output id="selected-coordinate" class="coordinate" aria-label="Selected cell">A1</output></div>
+        <div id="number-pad" class="number-pad" aria-label="Number pad">
+          <button id="erase" class="number-button erase-button" aria-label="Erase selected cell" title="Erase (Backspace, Delete, or 0)"><svg aria-hidden="true"><use href="#i-erase"/></svg><span>Erase</span></button>
+        </div>
+        <button id="load-example" class="example-button">Try an example puzzle<svg aria-hidden="true"><use href="#i-arrow"/></svg></button>
+        <div id="difficulty-controls" role="group" aria-label="Adjust puzzle clues" data-removal-state="unavailable">
+          <div class="difficulty-buttons">
+            <button id="harder" class="difficulty-button" aria-describedby="difficulty-note" disabled><svg aria-hidden="true"><use href="#i-minus"/></svg>Harder</button>
+            <button id="easier" class="difficulty-button" aria-describedby="difficulty-note" title="Add one random clue from the solution" disabled><svg aria-hidden="true"><use href="#i-plus"/></svg>Easier</button>
+          </div>
+          <p id="difficulty-note" class="difficulty-note" role="status">Checking the puzzle…</p>
+          <button id="retry-removal" class="text-button" hidden>Retry removal check</button>
+        </div>
+        </div>
+      </section>
+    </main>
+    <footer class="page-footer"><span>Made for the quiet art of puzzle making.</span><span class="save-state"><svg aria-hidden="true"><use href="#i-check"/></svg><span id="save-state">Draft saved in this browser</span></span></footer>
+  </div>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <!-- Both the worker and the editor are inline: this file works without a server or dependencies. -->
+  <script id="solver-worker" type="text/plain">
+  'use strict';
+  const FULL = 511;
+  const ROW = new Uint8Array(81), COL = new Uint8Array(81), BOX = new Uint8Array(81);
+  const UNITS = Array.from({ length: 27 }, () => []);
+  const POPCOUNT = new Uint8Array(512);
+  for (let bits = 1; bits < 512; bits++) POPCOUNT[bits] = POPCOUNT[bits >> 1] + (bits & 1);
+  for (let i = 0; i < 81; i++) {
+    ROW[i] = Math.floor(i / 9); COL[i] = i % 9;
+    BOX[i] = Math.floor(ROW[i] / 3) * 3 + Math.floor(COL[i] / 3);
+    UNITS[ROW[i]].push(i); UNITS[9 + COL[i]].push(i); UNITS[18 + BOX[i]].push(i);
+  }
+
+  // Exact search, capped at two solutions. Propagation is an optimization;
+  // uniqueness is reported only after every remaining branch has been exhausted.
+  function countSolutions(input, budgetMs = 8000) {
+    const started = performance.now();
+    const board = Uint8Array.from(input), used = new Uint16Array(27);
+    const candidates = new Uint16Array(81), trail = [];
+    let count = 0, nodes = 0, timedOut = false, solution = null;
+    if (input.length !== 81 || input.some(n => !Number.isInteger(n) || n < 0 || n > 9)) {
+      throw new Error('Expected 81 digits from 0 to 9.');
+    }
+    for (let i = 0; i < 81; i++) {
+      if (!board[i]) continue;
+      const bit = 1 << (board[i] - 1);
+      if ((used[ROW[i]] | used[9 + COL[i]] | used[18 + BOX[i]]) & bit) {
+        return { status: 'conflict', count: 0, solution: null, nodes: 0, elapsed: performance.now() - started };
+      }
+      used[ROW[i]] |= bit; used[9 + COL[i]] |= bit; used[18 + BOX[i]] |= bit;
+    }
+    function place(i, bit) {
+      board[i] = 32 - Math.clz32(bit);
+      used[ROW[i]] |= bit; used[9 + COL[i]] |= bit; used[18 + BOX[i]] |= bit;
+      trail.push(i);
+    }
+    function rollback(mark) {
+      while (trail.length > mark) {
+        const i = trail.pop(), bit = 1 << (board[i] - 1);
+        used[ROW[i]] ^= bit; used[9 + COL[i]] ^= bit; used[18 + BOX[i]] ^= bit;
+        board[i] = 0;
+      }
+    }
+    function search() {
+      if ((nodes++ & 255) === 0 && performance.now() - started >= budgetMs) {
+        timedOut = true;
+        return;
+      }
+      const mark = trail.length;
+      let bestCell = -1, bestBits = 0, bestSize = 10;
+      while (true) {
+        let changed = false, empty = 0;
+        bestCell = -1; bestSize = 10;
+        for (let i = 0; i < 81; i++) {
+          if (board[i]) { candidates[i] = 0; continue; }
+          const bits = FULL & ~(used[ROW[i]] | used[9 + COL[i]] | used[18 + BOX[i]]);
+          candidates[i] = bits;
+          if (!bits) { rollback(mark); return; }
+          const size = POPCOUNT[bits];
+          if (size === 1) { place(i, bits); changed = true; }
+          else if (size < bestSize) { bestCell = i; bestBits = bits; bestSize = size; }
+          empty++;
+        }
+        if (!empty) {
+          count++;
+          // Preserve the first complete grid before rollback resumes the search.
+          if (!solution) solution = Array.from(board);
+          rollback(mark); return;
+        }
+        if (changed) continue; // Recompute candidates after placing naked singles.
+        for (let u = 0; u < 27; u++) {
+          let seen = 0, repeated = 0;
+          for (const i of UNITS[u]) { repeated |= seen & candidates[i]; seen |= candidates[i]; }
+          const missing = FULL & ~used[u];
+          if (missing & ~seen) { rollback(mark); return; }
+          const singles = seen & ~repeated;
+          if (singles) {
+            const bit = singles & -singles;
+            for (const i of UNITS[u]) if (candidates[i] & bit) { place(i, bit); break; }
+            changed = true;
+            break;
+          }
+        }
+        if (!changed) break;
+      }
+      // Branch on the tightest cell or unit/digit constraint. A unit with two
+      // possible positions can be a better choice than a cell with three digits.
+      let choices = [];
+      for (let bits = bestBits; bits; bits &= bits - 1) choices.push([bestCell, bits & -bits]);
+      if (bestSize > 2) {
+        outer: for (let u = 0; u < 27; u++) {
+          for (let bits = FULL & ~used[u]; bits; bits &= bits - 1) {
+            const bit = bits & -bits, positions = [];
+            for (const i of UNITS[u]) if (candidates[i] & bit) positions.push([i, bit]);
+            if (positions.length < choices.length) choices = positions;
+            if (choices.length === 2) break outer;
+          }
+        }
+      }
+      const branchMark = trail.length;
+      for (const [i, bit] of choices) {
+        place(i, bit);
+        search();
+        rollback(branchMark);
+        if (count >= 2 || timedOut) break;
+      }
+      rollback(mark);
+    }
+    search();
+    return {
+      status: count >= 2 ? 'multiple' : timedOut ? 'incomplete' : count === 1 ? 'unique' : 'none',
+      count, solution, nodes, elapsed: performance.now() - started
+    };
+  }
+  // Called only after the original grid has been proven unique. Return the first
+  // safe removal in random order; "minimal" requires checking every given.
+  function findRemovableClue(input, budgetMs = 8000) {
+    const started = performance.now(), trial = Array.from(input);
+    const indices = trial.flatMap((value, i) => value ? [i] : []);
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    let unresolved = false;
+    for (const index of indices) {
+      const remaining = budgetMs - (performance.now() - started);
+      if (remaining <= 0) return { status: 'incomplete', index: null };
+      const value = trial[index]; trial[index] = 0;
+      const result = countSolutions(trial, Math.min(remaining, Math.max(250, budgetMs / 16)));
+      trial[index] = value;
+      if (result.status === 'unique') return { status: 'available', index };
+      // A timed-out probe is unknown, not proof that the clue is essential.
+      if (result.status !== 'multiple') unresolved = true;
+    }
+    return { status: unresolved ? 'incomplete' : 'minimal', index: null };
+  }
+  self.onmessage = ({ data }) => {
+    let kind = 'check';
+    try {
+      const result = countSolutions(data.board, data.budgetMs);
+      self.postMessage({ id: data.id, kind, ...result });
+      // Publish uniqueness immediately; optional removal analysis follows in
+      // the same cancellable worker without delaying the live-check result.
+      if (result.status === 'unique') {
+        kind = 'removal';
+        self.postMessage({ id: data.id, kind, ...findRemovableClue(data.board, data.budgetMs) });
+      }
+    } catch (error) {
+      self.postMessage({ id: data.id, kind, status: 'error', message: String(error) });
+    }
+  };
+  </script>
+  <script id="hint-engine">
+  // Independent human-style deductions. This engine never receives a solution.
+  const SudokuHints = (() => {
+    const ALL = 511, digits = mask => Array.from({ length: 9 }, (_, i) => i + 1).filter(n => mask & (1 << (n - 1)));
+    const bit = n => 1 << (n - 1), size = mask => digits(mask).length;
+    const row = i => Math.floor(i / 9), col = i => i % 9, box = i => Math.floor(row(i) / 3) * 3 + Math.floor(col(i) / 3);
+    const coord = i => 'ABCDEFGHI'[col(i)] + (row(i) + 1);
+    const units = Array.from({ length: 27 }, (_, u) => Array.from({ length: 81 }, (_, i) => i).filter(i => u < 9 ? row(i) === u : u < 18 ? col(i) === u - 9 : box(i) === u - 18));
+    const unitName = u => u < 9 ? `row ${u + 1}` : u < 18 ? `column ${'ABCDEFGHI'[u - 9]}` : `box ${u - 17}`;
+    const unitColor = u => u < 9 ? 'row' : u < 18 ? 'column' : 'box';
+    const sees = (a, b) => a !== b && (row(a) === row(b) || col(a) === col(b) || box(a) === box(b));
+    const names = indices => indices.map(coord).join(', ');
+    const numbers = mask => digits(mask).join(', ');
+    const unique = values => [...new Set(values)];
+    function combinations(values, count) {
+      const result = [];
+      function visit(start, chosen) {
+        if (chosen.length === count) { result.push(chosen.slice()); return; }
+        for (let i = start; i <= values.length - count + chosen.length; i++) { chosen.push(values[i]); visit(i + 1, chosen); chosen.pop(); }
+      }
+      visit(0, []); return result;
+    }
+    function candidates(board, excluded = []) {
+      return board.map((value, i) => {
+        if (value) return 0;
+        let used = excluded[i] || 0;
+        for (const u of [row(i), 9 + col(i), 18 + box(i)]) for (const j of units[u]) if (board[j]) used |= bit(board[j]);
+        return ALL & ~used;
+      });
+    }
+    function step(title, text, color, cells, remove = []) { return { title, text, color, cells: unique(cells), remove }; }
+    function make(type, technique, rank, target, value, remove, steps, noteCells, notes, conclusion) {
+      return { type, technique, rank, level: rank <= 3 ? 'Novice' : rank < 20 ? 'Beginner' : rank < 40 ? 'Intermediate' : rank < 60 ? 'Advanced' : 'Expert', target, value, remove, steps, noteCells: unique(noteCells), notes, conclusion };
+    }
+    function elimination(technique, rank, remove, setup, pattern, notes) {
+      const target = remove[0].index;
+      const summary = remove.map(({ index, mask }) => `${numbers(mask)} from ${coord(index)}`).join('; ');
+      const final = step('Cross out the impossible notes', `Remove ${summary}. These notes cannot be true in any completion. This step removes possibilities; it does not place a number yet.`, 'result', remove.map(e => e.index), remove);
+      return make('elimination', technique, rank, target, null, remove, [...setup, final], [...pattern, ...remove.map(e => e.index)], notes, 'Apply these eliminations, then look again for the easiest move.');
+    }
+    function direct(board, notes, excluded) {
+      // Exhaust each rank across the entire grid before trying a harder rank.
+      const groups = [[0], [1], [2], [0, 1], [0, 2], [1, 2], [0, 1, 2]];
+      for (let rank = 0; rank < groups.length; rank++) for (let i = 0; i < 81; i++) {
+        if (board[i]) continue;
+        const scope = [row(i), 9 + col(i), 18 + box(i)];
+        const selectedUnits = groups[rank].map(k => scope[k]);
+        const masks = selectedUnits.map(u => units[u].reduce((m, j) => m | (board[j] ? bit(board[j]) : 0), 0));
+        const remaining = ALL & ~masks.reduce((a, b) => a | b, 0);
+        if (size(remaining) !== 1) continue;
+        let crossed = 0;
+        const steps = selectedUnits.map((u, k) => {
+          const removed = masks[k] & ~crossed; crossed |= masks[k];
+          return step(`Check ${unitName(u)}`, `${unitName(u)[0].toUpperCase() + unitName(u).slice(1)} already contains ${numbers(masks[k])}. A digit cannot repeat in a row, column, or 3 × 3 box, so cross out ${numbers(removed)} at ${coord(i)}.`, unitColor(u), units[u].filter(j => board[j]), [{ index: i, mask: removed }]);
+        });
+        const label = groups[rank].map(k => ['Row', 'column', 'box'][k]).join(' + ');
+        const value = digits(remaining)[0], displayNotes = notes.slice(); displayNotes[i] = ALL;
+        return make('placement', selectedUnits.length === 1 ? `${label[0].toUpperCase() + label.slice(1)} alone` : label, rank + 1, i, value, [], steps, [i], displayNotes, `Only ${value} remains. ${coord(i)} must be ${value}.`);
+      }
+      for (let i = 0; i < 81; i++) if (!board[i] && size(notes[i]) === 1) {
+        const raw = candidates(board)[i], value = digits(notes[i])[0], displayNotes = notes.slice(); displayNotes[i] = raw;
+        return make('placement', 'Single after earlier eliminations', 8, i, value, [], [step('Use the notes already proved', `Earlier teaching steps ruled out ${numbers(raw & (excluded[i] || 0))} at ${coord(i)}. Together with the placed numbers, that leaves only ${value}.`, 'pattern', [i], [{ index: i, mask: raw & ~notes[i] }])], [i], displayNotes, `Place ${value} in ${coord(i)}.`);
+      }
+      return null;
+    }
+    function hiddenSingle(board, notes) {
+      for (let u = 0; u < 27; u++) for (let n = 1; n <= 9; n++) {
+        const mask = bit(n), positions = units[u].filter(i => notes[i] & mask);
+        if (positions.length !== 1) continue;
+        const target = positions[0], empty = units[u].filter(i => !board[i]), other = empty.filter(i => i !== target);
+        const witnesses = unique(other.flatMap(i => board.flatMap((value, j) => value === n && sees(i, j) ? [j] : [])));
+        const displayNotes = notes.slice(); for (const i of empty) displayNotes[i] |= mask;
+        return make('placement', `Hidden single in a ${u < 9 ? 'row' : u < 18 ? 'column' : 'box'}`, 9 + Math.floor(u / 9), target, n, [], [
+          step(`Find a home for ${n}`, `Every ${unitName(u).split(' ')[0]} needs one ${n}. Look at the empty cells in ${unitName(u)}.`, unitColor(u), units[u]),
+          step('Rule out the other homes', `The highlighted ${n}s and any previously proved notes rule out ${n} in ${names(other)}. Only ${coord(target)} can take ${n} in ${unitName(u)}.`, 'pattern', [...witnesses, ...other], other.map(index => ({ index, mask }))),
+          step('Keep the only possible home', `${coord(target)} may have other notes, but ${n} has no other home in ${unitName(u)}. Cross out the other notes here.`, 'result', [target], [{ index: target, mask: notes[target] & ~mask }])
+        ], empty, displayNotes, `Place ${n} in ${coord(target)}.`);
+      }
+      return null;
+    }
+    function locked(board, notes) {
+      for (const u of [...Array.from({ length: 9 }, (_, i) => i + 18), ...Array.from({ length: 18 }, (_, i) => i)]) for (let n = 1; n <= 9; n++) {
+        const mask = bit(n), positions = units[u].filter(i => notes[i] & mask);
+        if (positions.length < 2) continue;
+        const destinations = u >= 18 ? [row(positions[0]), 9 + col(positions[0])] : [18 + box(positions[0])];
+        for (const v of destinations) {
+          if (!positions.every(i => units[v].includes(i))) continue;
+          const remove = units[v].filter(i => !units[u].includes(i) && (notes[i] & mask)).map(index => ({ index, mask }));
+          if (!remove.length) continue;
+          return elimination(`Locked candidates · ${u >= 18 ? 'pointing' : 'claiming'}`, 20, remove, [
+            step(`Locate ${n} in ${unitName(u)}`, `The only remaining homes for ${n} in ${unitName(u)} are ${names(positions)}.`, unitColor(u), units[u]),
+            step('Notice the shared region', `All those homes also lie in ${unitName(v)}. One of them must be ${n}, so ${n} cannot appear elsewhere in ${unitName(v)}.`, unitColor(v), positions)
+          ], units[u].filter(i => !board[i]), notes);
+        }
+      }
+      return null;
+    }
+    function subset(board, notes, count, hidden) {
+      const name = `${hidden ? 'Hidden' : 'Naked'} ${count === 2 ? 'pair' : 'triple'}`;
+      for (let u = 0; u < 27; u++) {
+        const empty = units[u].filter(i => !board[i]);
+        const options = hidden ? digits(empty.reduce((m, i) => m | notes[i], 0)) : empty.filter(i => size(notes[i]) >= 2 && size(notes[i]) <= count);
+        for (const chosen of combinations(options, count)) {
+          const mask = hidden ? chosen.reduce((m, n) => m | bit(n), 0) : chosen.reduce((m, i) => m | notes[i], 0);
+          if (size(mask) !== count) continue;
+          const cells = hidden ? empty.filter(i => notes[i] & mask) : chosen;
+          if (cells.length !== count) continue;
+          const remove = (hidden ? cells : empty.filter(i => !cells.includes(i))).map(index => ({ index, mask: notes[index] & (hidden ? ~mask : mask) })).filter(e => e.mask);
+          if (!remove.length) continue;
+          return elimination(name, (count === 2 ? 30 : 40) + Number(hidden), remove, [
+            step(`Inspect ${unitName(u)}`, hidden ? `In ${unitName(u)}, the digits ${numbers(mask)} appear as notes only in ${names(cells)}.` : `The cells ${names(cells)} share ${unitName(u)} and contain only the notes ${numbers(mask)} between them.`, unitColor(u), units[u]),
+            step('Reserve these cells and digits', `These ${count} cells must use these ${count} digits, in some order. ${hidden ? 'No other digit can go in these cells.' : 'These digits cannot go in any other cell of this region.'}`, 'pattern', cells)
+          ], empty, notes);
+        }
+      }
+      return null;
+    }
+    function fish(board, notes, count) {
+      for (const orientation of [0, 1]) for (let n = 1; n <= 9; n++) {
+        const mask = bit(n), offset = orientation * 9;
+        const options = Array.from({ length: 9 }, (_, i) => i).filter(u => { const length = units[offset + u].filter(i => notes[i] & mask).length; return length >= 2 && length <= count; });
+        for (const chosen of combinations(options, count)) {
+          const cells = chosen.flatMap(u => units[offset + u].filter(i => notes[i] & mask));
+          const covers = unique(cells.map(i => orientation ? row(i) : col(i)));
+          if (covers.length !== count) continue;
+          const remove = covers.flatMap(u => units[(1 - orientation) * 9 + u]).filter(i => !chosen.includes(orientation ? col(i) : row(i)) && (notes[i] & mask)).map(index => ({ index, mask }));
+          if (!remove.length) continue;
+          return elimination(count === 2 ? 'X-Wing' : 'Swordfish', count === 2 ? 50 : 70, remove, [
+            step(`Find matching homes for ${n}`, `In ${chosen.map(u => unitName(offset + u)).join(', ')}, every possible ${n} is confined to ${covers.map(u => unitName((1 - orientation) * 9 + u)).join(', ')}.`, orientation ? 'column' : 'row', cells),
+            step('Reserve the crossing regions', `The ${count} ${orientation ? 'columns' : 'rows'} each need a ${n}. Those ${count} placements occupy all ${count} crossing ${orientation ? 'rows' : 'columns'}, so no other ${n} can appear there.`, 'pattern', cells)
+          ], [...cells, ...remove.map(e => e.index)], notes);
+        }
+      }
+      return null;
+    }
+    function xyWing(board, notes) {
+      const two = notes.flatMap((mask, i) => size(mask) === 2 ? [i] : []);
+      for (const pivot of two) {
+        const wings = two.filter(i => sees(i, pivot) && size(notes[i] & notes[pivot]) === 1 && size(notes[i] | notes[pivot]) === 3);
+        for (const [a, b] of combinations(wings, 2)) {
+          if ((notes[a] & notes[pivot]) === (notes[b] & notes[pivot])) continue;
+          const z = notes[a] & notes[b] & ~notes[pivot];
+          if (size(z) !== 1) continue;
+          const remove = notes.flatMap((mask, index) => (mask & z) && index !== pivot && index !== a && index !== b && sees(index, a) && sees(index, b) ? [{ index, mask: z }] : []);
+          if (!remove.length) continue;
+          const x = numbers(notes[a] & notes[pivot]), y = numbers(notes[b] & notes[pivot]);
+          return elimination('XY-Wing', 60, remove, [
+            step('Find a pivot and two wings', `${coord(pivot)} has ${numbers(notes[pivot])}. It shares a region with each wing: ${coord(a)} (${numbers(notes[a])}) and ${coord(b)} (${numbers(notes[b])}).`, 'pattern', [pivot, a, b]),
+            step('Both cases give the same elimination', `If ${coord(pivot)} is ${x}, ${coord(a)} must be ${numbers(z)}. If it is ${y}, ${coord(b)} must be ${numbers(z)}. Any cell that sees both wings therefore cannot be ${numbers(z)}. This covers both cases without guessing either one.`, 'box', [pivot, a, b])
+          ], [pivot, a, b], notes);
+        }
+      }
+      return null;
+    }
+    function next(board, excluded = Array(81).fill(0)) {
+      const notes = candidates(board, excluded);
+      for (const unit of units) {
+        const placed = unit.map(i => board[i]).filter(Boolean);
+        const possible = unit.reduce((mask, i) => mask | (board[i] ? bit(board[i]) : notes[i]), 0);
+        if (new Set(placed).size !== placed.length || possible !== ALL || unit.some(i => !board[i] && !notes[i])) return { type: 'invalid', technique: 'Check the puzzle', steps: [], conclusion: 'These numbers or notes contradict a Sudoku rule. Undo the last change before continuing.' };
+      }
+      if (board.every(Boolean)) return { type: 'complete', technique: 'Puzzle complete', steps: [], conclusion: 'Every row, column, and box contains 1–9. You have finished the puzzle; your original clues are preserved.' };
+      const hint = direct(board, notes, excluded) || hiddenSingle(board, notes) || locked(board, notes) || subset(board, notes, 2, false) || subset(board, notes, 2, true) || subset(board, notes, 3, false) || subset(board, notes, 3, true) || fish(board, notes, 2) || xyWing(board, notes) || fish(board, notes, 3);
+      if (hint) return hint;
+      const target = notes.reduce((best, mask, i) => mask && (best < 0 || size(mask) < size(notes[best])) ? i : best, -1);
+      return make('stalled', 'A trial branch would be next', 99, target, null, [], [step('No supported deduction remains', `${coord(target)} has notes ${numbers(notes[target])}, but none is forced by the techniques checked. No number has been filled in.`, 'pattern', [target])], [target], notes, 'This teaching solver would need to try a branch next. A more advanced logical technique may still exist; this is not proof that guessing is unavoidable.');
+    }
+    return { next, candidates, coord };
+  })();
+  </script>
+  <script>
+  (() => {
+    'use strict';
+    const $ = id => document.getElementById(id);
+    const STORAGE_KEY = 'sudoku-studio-draft-v1';
+    const EXAMPLE = '530070000600195000098000060800060003400803001700020006060000280000419005000080079';
+    const letters = 'ABCDEFGHI';
+    const grid = $('sudoku-grid'), pad = $('number-pad');
+    const cells = [], numberButtons = [];
+    const units = Array.from({ length: 27 }, () => []);
+    let board = Array(81).fill(0), selected = 0;
+    // Preview values never enter the editable board, history, or saved draft.
+    let solution = null, showingSolution = false;
+    let teaching = false, currentHint = null, hintStep = 0, hintApplied = false;
+    let learned = Array(81).fill(0), excludedNotes = Array(81).fill(0);
+    let lessonHistory = [], lessonFuture = [];
+    const hintColors = ['row', 'column', 'box', 'pattern', 'result'];
+    let removalState = 'unavailable', removableIndex = null;
+    let history = [], future = [], conflicts = new Set();
+    let worker = null, pending = false, requestId = 0;
+    let debounceTimer, slowTimer, toastTimer, saveTimer;
+    let saveAvailable = true;
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if (Array.isArray(saved) && saved.length === 81 && saved.every(n => Number.isInteger(n) && n >= 0 && n <= 9)) board = saved;
+    } catch { saveAvailable = false; }
+    if (!saveAvailable) $('save-state').textContent = 'Browser storage unavailable · keep this tab open';
+
+    for (let row = 0; row < 9; row++) {
+      const columnLabel = document.createElement('span'); columnLabel.textContent = letters[row];
+      $('column-labels').append(columnLabel);
+      const rowLabel = document.createElement('span'); rowLabel.textContent = row + 1;
+      $('row-labels').append(rowLabel);
+      const rowElement = document.createElement('div');
+      rowElement.className = 'grid-row'; rowElement.setAttribute('role', 'row');
+      rowElement.setAttribute('aria-rowindex', row + 1);
+      for (let col = 0; col < 9; col++) {
+        const i = row * 9 + col, box = Math.floor(row / 3) * 3 + Math.floor(col / 3);
+        units[row].push(i); units[9 + col].push(i); units[18 + box].push(i);
+        const cell = document.createElement('button');
+        cell.type = 'button'; cell.className = 'cell'; cell.dataset.index = i;
+        cell.setAttribute('role', 'gridcell'); cell.setAttribute('aria-colindex', col + 1);
+        if (col === 2 || col === 5) cell.classList.add('box-right');
+        if (row === 2 || row === 5) cell.classList.add('box-bottom');
+        cell.addEventListener('focus', () => { if (selected !== i) selectCell(i, false); });
+        cell.addEventListener('click', () => selectCell(i));
+        rowElement.append(cell); cells.push(cell);
+      }
+      grid.append(rowElement);
+    }
+    for (let n = 1; n <= 9; n++) {
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = 'number-button'; button.textContent = n;
+      button.setAttribute('aria-label', `Enter ${n}`);
+      button.addEventListener('click', () => { enter(n); cells[selected].focus({ preventScroll: true }); });
+      pad.insertBefore(button, $('erase')); numberButtons.push(button);
+    }
+    function findConflicts() {
+      const found = new Set();
+      for (const unit of units) {
+        const first = new Int16Array(10).fill(-1);
+        for (const i of unit) {
+          const value = board[i];
+          if (!value) continue;
+          if (first[value] !== -1) { found.add(i); found.add(first[value]); }
+          else first[value] = i;
+        }
+      }
+      return found;
+    }
+    function render() {
+      const row = Math.floor(selected / 9), col = selected % 9;
+      const box = Math.floor(row / 3) * 3 + Math.floor(col / 3);
+      const displayed = showingSolution && solution ? solution : teaching ? learningBoard() : board;
+      const unique = $('status-panel').dataset.state === 'unique';
+      grid.classList.toggle('showing-solution', showingSolution);
+      $('workspace').classList.toggle('teaching', teaching);
+      grid.setAttribute('aria-describedby', teaching ? 'teaching-instructions' : 'grid-instructions');
+      const activeStep = teaching ? currentHint?.steps[hintStep] : null;
+      cells.forEach((cell, i) => {
+        const r = Math.floor(i / 9), c = i % 9;
+        cell.textContent = displayed[i] || '';
+        if (teaching && !displayed[i] && currentHint?.noteCells?.includes(i)) cell.replaceChildren(pencilGrid(i));
+        cell.classList.toggle('given-value', board[i] !== 0);
+        cell.classList.toggle('learned-value', teaching && learned[i] !== 0);
+        cell.classList.toggle('solution-value', showingSolution && board[i] === 0);
+        cell.classList.toggle('selected', i === selected);
+        cell.classList.toggle('peer', !teaching && (r === row || c === col || Math.floor(r / 3) * 3 + Math.floor(c / 3) === box));
+        cell.classList.toggle('same-value', !teaching && displayed[selected] !== 0 && displayed[i] === displayed[selected]);
+        cell.classList.remove(...hintColors.map(color => `color-${color}`));
+        const support = Boolean(activeStep?.cells.includes(i));
+        cell.classList.toggle('hint-support', support);
+        cell.classList.toggle('hint-target', teaching && currentHint?.target === i);
+        if (support) cell.classList.add(`color-${activeStep.color}`);
+        cell.classList.toggle('conflict', conflicts.has(i));
+        cell.tabIndex = i === selected ? 0 : -1;
+        cell.setAttribute('aria-selected', i === selected ? 'true' : 'false');
+        cell.setAttribute('aria-invalid', conflicts.has(i) ? 'true' : 'false');
+        cell.setAttribute('aria-label', `Row ${r + 1}, column ${letters[c]}, ${displayed[i] || 'empty'}${conflicts.has(i) ? ', conflicting given' : board[i] ? ', given' : teaching && learned[i] ? ', learned answer' : showingSolution ? ', solution value' : ''}${teaching && currentHint?.target === i ? ', hint target' : ''}`);
+      });
+      numberButtons.forEach((button, i) => button.classList.toggle('current', board[selected] === i + 1));
+      $('selected-coordinate').textContent = letters[col] + (row + 1);
+      const givenCount = board.filter(Boolean).length;
+      $('given-count').textContent = givenCount;
+      $('undo').disabled = teaching ? !lessonHistory.length : !history.length;
+      $('redo').disabled = teaching ? !lessonFuture.length : !future.length;
+      $('clear').disabled = teaching ? !learned.some(Boolean) && !excludedNotes.some(Boolean) : !givenCount;
+      $('clear').textContent = teaching ? 'Reset lesson' : 'Clear grid';
+      $('erase').disabled = !board[selected];
+      $('board-title').textContent = showingSolution ? unique ? 'The solution' : 'A possible solution' : teaching ? 'Learning board' : 'Your puzzle';
+      $('board-note').textContent = showingSolution ? 'Bold: your clues · Light: solution' : teaching ? `${learned.filter(Boolean).length} learned · Original clues preserved` : 'Every number you enter is a clue.';
+      $('solution-toggle').disabled = !solution;
+      $('solution-toggle').setAttribute('aria-pressed', String(showingSolution));
+      $('solution-toggle-label').textContent = showingSolution ? 'Hide solution' : solution ? unique ? 'Show the solution' : 'Show a possible solution' : 'Show solution';
+      $('solution-toggle-icon').setAttribute('href', showingSolution ? '#i-eye-off' : '#i-eye');
+      $('solution-toggle').title = solution ? 'Preview the completed grid. Your clues are preserved.' : 'Available when the checker finds a solution.';
+      $('harder').disabled = !unique || removalState !== 'available';
+      $('easier').disabled = !solution || givenCount === 81;
+      $('difficulty-controls').dataset.removalState = removalState;
+      $('retry-removal').hidden = !unique || !['incomplete', 'error'].includes(removalState);
+      let note = 'Fix the puzzle to adjust its clues.';
+      if ($('status-panel').dataset.state === 'checking') note = 'Checking the puzzle…';
+      else if (unique) {
+        if (removalState === 'checking') note = 'Checking which clues can be removed…';
+        else if (removalState === 'minimal') note = 'Every remaining clue is needed for one solution.';
+        else if (removalState === 'incomplete' || removalState === 'error') note = 'Removal check unfinished. You can try again.';
+        else note = givenCount === 81 ? 'The grid is full. Harder removes a clue.' : 'Remove one clue, or add one from the solution.';
+      } else if (solution) note = 'Harder needs exactly one solution. Easier adds a clue.';
+      else if ($('status-panel').dataset.state === 'incomplete') note = 'Finish the live check to adjust clues.';
+      $('difficulty-note').textContent = note;
+      $('harder').title = removalState === 'available' ? 'Remove one clue while keeping exactly one solution' : note;
+      $('builder-controls').hidden = teaching;
+      $('lesson-panel').hidden = !teaching;
+      $('close-teaching').hidden = !teaching;
+      $('grid-instructions').hidden = teaching;
+      $('teaching-instructions').hidden = !teaching;
+      $('show-hint').textContent = teaching && hintApplied ? 'Next hint' : 'Show hint';
+      $('show-hint').disabled = !solution || (teaching && Boolean(currentHint) && !hintApplied);
+      if (teaching) renderLesson();
+    }
+    function learningBoard() { return board.map((value, i) => value || learned[i]); }
+    function pencilNote(index, digit) {
+      const element = document.createElement('span'), mask = 1 << (digit - 1);
+      element.className = 'pencil-note'; element.dataset.digit = digit;
+      if (!(currentHint?.notes?.[index] & mask)) return element;
+      element.textContent = digit;
+      for (let s = 0; s <= hintStep; s++) {
+        const step = currentHint.steps[s];
+        if (step?.remove.some(item => item.index === index && (item.mask & mask))) {
+          element.classList.add('cut', `color-${step.color}`); element.dataset.step = s + 1;
+          element.title = `${digit} ruled out in step ${s + 1}: ${step.title}`;
+          element.setAttribute('aria-label', element.title);
+          return element;
+        }
+      }
+      if (currentHint.type === 'placement' && currentHint.target === index && currentHint.value === digit && hintStep === currentHint.steps.length - 1) element.classList.add('kept');
+      element.setAttribute('aria-label', `${digit} remains possible`);
+      return element;
+    }
+    function pencilGrid(index) {
+      const element = document.createElement('span'); element.className = 'pencil-grid';
+      for (let n = 1; n <= 9; n++) element.append(pencilNote(index, n));
+      return element;
+    }
+    function renderLesson() {
+      const hint = currentHint, step = hint?.steps[hintStep], last = hint && hintStep === hint.steps.length - 1;
+      $('lesson-panel').dataset.hintType = hint?.type || 'ready';
+      $('lesson-panel').dataset.rank = hint?.rank || '';
+      $('lesson-panel').dataset.step = hintStep + 1;
+      $('lesson-panel').dataset.applied = String(hintApplied);
+      $('hint-level').textContent = hint?.level || (hint?.type === 'complete' ? 'Finished' : 'Ready');
+      $('hint-title').textContent = hint?.technique || 'One deduction at a time';
+      $('hint-focus').textContent = hint?.target !== undefined ? `Focus: ${SudokuHints.coord(hint.target)} · ${hint.type === 'elimination' ? 'A note elimination' : hint.type === 'stalled' ? 'No proven placement' : 'A number placement'}` : 'Your learning progress is separate from your original clues.';
+      $('hint-steps').replaceChildren();
+      hint?.steps.forEach((item, i) => {
+        const button = document.createElement('button'); button.className = `hint-step-button color-${item.color}`;
+        button.textContent = i + 1; button.title = item.title;
+        button.setAttribute('aria-label', `Step ${i + 1}: ${item.title}`);
+        if (i === hintStep) button.setAttribute('aria-current', 'step');
+        button.disabled = hintApplied;
+        button.addEventListener('click', () => { hintStep = i; render(); });
+        $('hint-steps').append(button);
+      });
+      $('hint-message').className = `hint-message color-${step?.color || 'pattern'}`;
+      $('hint-step-title').textContent = step ? `Step ${hintStep + 1} of ${hint.steps.length} · ${step.title}` : hint?.technique || 'Find the easiest available move';
+      $('hint-explanation').textContent = step?.text || hint?.conclusion || 'Select Show hint to find the easiest deduction across the learning board. Numbered steps connect the explanation, highlighted cells, and crossed-out notes.';
+      $('hint-notes-section').hidden = !hint?.notes;
+      $('hint-notes-label').textContent = hint?.notes ? `${SudokuHints.coord(hint.target)} · candidate notes after this step` : '';
+      $('hint-notes').replaceChildren();
+      if (hint?.notes) for (let n = 1; n <= 9; n++) $('hint-notes').append(pencilNote(hint.target, n));
+      $('hint-conclusion').textContent = hint && (last || hintApplied) ? `${hintApplied ? 'Applied. ' : ''}${hint.conclusion}` : '';
+      $('hint-navigation').hidden = !hint || hint.steps.length < 2;
+      $('previous-step').disabled = hintApplied || hintStep === 0;
+      $('next-step').disabled = hintApplied || !hint || hintStep >= hint.steps.length - 1;
+      const actionable = hint && ['placement', 'elimination'].includes(hint.type);
+      $('apply-hint').hidden = !actionable;
+      $('apply-hint').disabled = hintApplied || !last;
+      $('apply-hint').textContent = hintApplied ? 'Applied to your learning board' : hint?.type === 'placement' ? `Place ${hint.value} in ${SudokuHints.coord(hint.target)}` : 'Apply note eliminations';
+    }
+    function requestHint() {
+      if (!solution) return;
+      teaching = true; showingSolution = false; hintStep = 0; hintApplied = false;
+      currentHint = SudokuHints.next(learningBoard(), excludedNotes);
+      if (currentHint.target !== undefined) selected = currentHint.target;
+      render();
+    }
+    function lessonSnapshot() { return { learned: learned.slice(), excluded: excludedNotes.slice() }; }
+    function rememberLesson() { lessonHistory.push(lessonSnapshot()); if (lessonHistory.length > 900) lessonHistory.shift(); lessonFuture = []; }
+    function restoreLesson(snapshot) {
+      learned = snapshot.learned; excludedNotes = snapshot.excluded;
+      currentHint = null; hintApplied = false; hintStep = 0; render();
+    }
+    function applyHint() {
+      if (!currentHint || hintApplied || hintStep !== currentHint.steps.length - 1 || !['placement', 'elimination'].includes(currentHint.type)) return;
+      rememberLesson();
+      if (currentHint.type === 'placement') learned[currentHint.target] = currentHint.value;
+      else for (const { index, mask } of currentHint.remove) excludedNotes[index] |= mask;
+      hintApplied = true; render();
+    }
+    function selectCell(i, focus = true) {
+      selected = i; render();
+      if (focus) cells[i].focus({ preventScroll: true });
+    }
+    function saveDraft() {
+      clearTimeout(saveTimer);
+      if (!saveAvailable) return;
+      $('save-state').textContent = 'Saving draft…';
+      saveTimer = setTimeout(() => {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(board));
+          $('save-state').textContent = 'Draft saved in this browser';
+        } catch {
+          saveAvailable = false;
+          $('save-state').textContent = 'Browser storage unavailable · keep this tab open';
+        }
+      }, 150);
+    }
+    function changed() {
+      teaching = false; currentHint = null; hintApplied = false;
+      learned = Array(81).fill(0); excludedNotes = Array(81).fill(0); lessonHistory = []; lessonFuture = [];
+      conflicts = findConflicts(); saveDraft(); queueCheck();
+    }
+    function commit(next, nextSelected = selected) {
+      if (showingSolution) { showingSolution = false; render(); }
+      if (next.every((value, i) => value === board[i])) return;
+      history.push({ board: board.slice(), selected });
+      if (history.length > 500) history.shift();
+      future = []; board = next; selected = nextSelected;
+      changed();
+    }
+    function enter(value) { const next = board.slice(); next[selected] = value; commit(next); }
+    function undo() {
+      if (teaching) {
+        if (lessonHistory.length) { lessonFuture.push(lessonSnapshot()); restoreLesson(lessonHistory.pop()); }
+        return;
+      }
+      if (!history.length) return;
+      future.push({ board: board.slice(), selected });
+      const previous = history.pop(); board = previous.board; selected = previous.selected;
+      changed();
+    }
+    function redo() {
+      if (teaching) {
+        if (lessonFuture.length) { lessonHistory.push(lessonSnapshot()); restoreLesson(lessonFuture.pop()); }
+        return;
+      }
+      if (!future.length) return;
+      history.push({ board: board.slice(), selected });
+      const next = future.pop(); board = next.board; selected = next.selected;
+      changed();
+    }
+    function toast(message) {
+      clearTimeout(toastTimer); $('toast').textContent = message; $('toast').hidden = false;
+      toastTimer = setTimeout(() => { $('toast').hidden = true; }, 3200);
+    }
+    function showStatus(state, title, description, icon, timing = '') {
+      $('status-panel').dataset.state = state;
+      $('status-panel').setAttribute('aria-busy', state === 'checking' ? 'true' : 'false');
+      $('status-title').textContent = title;
+      $('status-description').textContent = description;
+      $('status-icon').setAttribute('href', `#i-${icon}`);
+      $('check-time').textContent = timing;
+      $('retry-check').hidden = state !== 'incomplete' && state !== 'error';
+      render();
+    }
+    function queueCheck(budgetMs = 8000) {
+      const id = ++requestId, started = performance.now();
+      solution = null; showingSolution = false;
+      removalState = 'unavailable'; removableIndex = null;
+      clearTimeout(debounceTimer); clearTimeout(slowTimer);
+      // A busy worker cannot process a cancellation message while searching.
+      // Terminating it guarantees new edits never wait behind an obsolete search.
+      if (pending && worker) { worker.terminate(); worker = null; pending = false; }
+      delete $('status-panel').dataset.elapsedMs;
+      delete $('status-panel').dataset.solverMs;
+      if (conflicts.size) {
+        showStatus('conflict', 'Conflicting givens', `${conflicts.size} highlighted cells repeat a number in a row, column, or box. Change or erase a repeated clue.`, 'alert', 'Conflicts detected immediately');
+        return;
+      }
+      showStatus('checking', 'Checking…', 'Looking for possible solutions. You can keep editing.', 'loader', 'Checking in the background');
+      slowTimer = setTimeout(() => {
+        if (id === requestId) showStatus('checking', 'Still checking…', 'This grid needs more searching. You can keep editing while we check.', 'loader', 'Uniqueness has not been determined');
+      }, 1000);
+      debounceTimer = setTimeout(() => {
+        if (id !== requestId) return;
+        try {
+          if (!worker) {
+            const url = URL.createObjectURL(new Blob([$('solver-worker').textContent], { type: 'text/javascript' }));
+            try { worker = new Worker(url); }
+            finally { URL.revokeObjectURL(url); }
+          }
+          const activeWorker = worker;
+          activeWorker.onmessage = ({ data }) => {
+            if (data.id !== requestId || activeWorker !== worker) return;
+            if (data.kind === 'removal') {
+              pending = false;
+              removalState = data.status; removableIndex = data.index ?? null;
+              render();
+              return;
+            }
+            // Keep the worker marked busy until its removal analysis finishes,
+            // so an edit also cancels that analysis and invalidates its result.
+            pending = data.status === 'unique'; clearTimeout(slowTimer);
+            removalState = pending ? 'checking' : 'unavailable';
+            solution = data.solution || null;
+            const totalMs = performance.now() - started;
+            const timing = `Checked in ${totalMs < 1000 ? Math.max(1, Math.round(totalMs)) + ' ms' : (totalMs / 1000).toFixed(2) + ' s'}`;
+            $('status-panel').dataset.elapsedMs = totalMs.toFixed(2);
+            $('status-panel').dataset.solverMs = Number(data.elapsed || 0).toFixed(2);
+            if (data.status === 'unique') {
+              showStatus('unique', 'Exactly one solution', board.every(Boolean) ? 'Your completed grid follows every Sudoku rule. Remove clues to start shaping a puzzle.' : 'Add or remove clues to shape your puzzle.', 'check', timing);
+            } else if (data.status === 'multiple') {
+              showStatus('multiple', 'Multiple solutions', board.some(Boolean) ? 'At least two ways to finish. Add or adjust clues to narrow it down to one.' : 'A blank canvas has many possibilities. Add your first clues, or try the example below.', 'many', timing);
+            } else if (data.status === 'none') {
+              showStatus('none', 'No solution', 'No completed grid fits these clues. There are no repeated givens, but the puzzle reaches a contradiction. Try undoing your last edit.', 'alert', timing);
+            } else if (data.status === 'incomplete') {
+              showStatus('incomplete', 'Check incomplete', 'The time limit was reached before we could determine uniqueness. Edit the grid or run a longer check.', 'clock', 'Uniqueness has not been determined');
+              $('retry-check').textContent = 'Run a longer check';
+            } else {
+              showStatus('error', 'Check unavailable', 'The background checker could not finish. Try checking again.', 'alert', 'Uniqueness has not been determined');
+              $('retry-check').textContent = 'Check again';
+            }
+          };
+          activeWorker.onerror = event => {
+            event.preventDefault();
+            if (activeWorker !== worker || id !== requestId) return;
+            clearTimeout(slowTimer); pending = false; activeWorker.terminate(); worker = null;
+            if (removalState === 'checking') {
+              removalState = 'error'; removableIndex = null; render(); return;
+            }
+            showStatus('error', 'Check unavailable', 'The background checker could not start in this browser. Try checking again or open this file in another browser.', 'alert', 'Uniqueness has not been determined');
+            $('retry-check').textContent = 'Check again';
+          };
+          pending = true;
+          activeWorker.postMessage({ id, board: board.slice(), budgetMs });
+        } catch {
+          pending = false; clearTimeout(slowTimer);
+          if (worker) worker.terminate(); worker = null;
+          showStatus('error', 'Check unavailable', 'This browser could not start the background checker. Try checking again or open this file in another browser.', 'alert', 'Uniqueness has not been determined');
+          $('retry-check').textContent = 'Check again';
+        }
+      }, 35);
+    }
+    $('undo').addEventListener('click', () => { undo(); cells[selected].focus({ preventScroll: true }); });
+    $('redo').addEventListener('click', () => { redo(); cells[selected].focus({ preventScroll: true }); });
+    $('erase').addEventListener('click', () => { enter(0); cells[selected].focus({ preventScroll: true }); });
+    $('clear').addEventListener('click', () => {
+      if (teaching) {
+        rememberLesson(); restoreLesson({ learned: Array(81).fill(0), excluded: Array(81).fill(0) });
+        toast('Lesson reset. Your original clues are preserved.'); return;
+      }
+      commit(Array(81).fill(0), 0); cells[selected].focus({ preventScroll: true }); toast('Grid cleared. Undo brings it back.');
+    });
+    $('load-example').addEventListener('click', () => {
+      commit(Array.from(EXAMPLE, Number), 2); cells[selected].focus({ preventScroll: true }); toast('Example loaded. Every clue is editable.');
+    });
+    $('retry-check').addEventListener('click', () => queueCheck(60000));
+    $('retry-removal').addEventListener('click', () => queueCheck(60000));
+    $('harder').addEventListener('click', () => {
+      if (removalState !== 'available' || removableIndex === null || $('status-panel').dataset.state !== 'unique') return;
+      const index = removableIndex, next = board.slice();
+      next[index] = 0;
+      commit(next, index);
+      toast(`Removed the clue at ${letters[index % 9]}${Math.floor(index / 9) + 1}. Still exactly one solution.`);
+    });
+    $('easier').addEventListener('click', () => {
+      if (!solution) return;
+      const empty = board.flatMap((value, i) => value ? [] : [i]);
+      if (!empty.length) return;
+      const index = empty[Math.floor(Math.random() * empty.length)], next = board.slice();
+      next[index] = solution[index];
+      commit(next, index);
+      toast(`Added a clue at ${letters[index % 9]}${Math.floor(index / 9) + 1}. Undo brings it back.`);
+    });
+    $('solution-toggle').addEventListener('click', () => {
+      if (!solution) return;
+      teaching = false; currentHint = null;
+      showingSolution = !showingSolution;
+      render();
+    });
+    $('show-hint').addEventListener('click', requestHint);
+    $('close-teaching').addEventListener('click', () => { teaching = false; currentHint = null; hintApplied = false; render(); });
+    $('previous-step').addEventListener('click', () => { if (hintStep > 0 && !hintApplied) { hintStep--; render(); } });
+    $('next-step').addEventListener('click', () => { if (currentHint && hintStep < currentHint.steps.length - 1 && !hintApplied) { hintStep++; render(); } });
+    $('apply-hint').addEventListener('click', applyHint);
+    document.addEventListener('keydown', event => {
+      if (event.isComposing || event.altKey) return;
+      const modifier = event.ctrlKey || event.metaKey;
+      if (modifier && event.key.toLowerCase() === 'z') {
+        event.preventDefault(); event.shiftKey ? redo() : undo(); cells[selected].focus({ preventScroll: true }); return;
+      }
+      if (modifier && event.key.toLowerCase() === 'y') {
+        event.preventDefault(); redo(); cells[selected].focus({ preventScroll: true }); return;
+      }
+      if (modifier) return;
+      const inEditor = grid.contains(event.target) || pad.contains(event.target) || event.target === document.body;
+      if (!inEditor) return;
+      if (teaching && (/^[1-9]$/.test(event.key) || ['Backspace', 'Delete', '0', '.'].includes(event.key))) {
+        event.preventDefault(); toast('Use Apply hint to learn, or Back to builder to edit your clues.'); return;
+      }
+      if (/^[1-9]$/.test(event.key)) { event.preventDefault(); enter(Number(event.key)); cells[selected].focus({ preventScroll: true }); }
+      else if (['Backspace', 'Delete', '0', '.'].includes(event.key)) { event.preventDefault(); enter(0); cells[selected].focus({ preventScroll: true }); }
+      else {
+        const row = Math.floor(selected / 9), col = selected % 9;
+        const moves = { ArrowLeft: row * 9 + Math.max(0, col - 1), ArrowRight: row * 9 + Math.min(8, col + 1), ArrowUp: Math.max(0, row - 1) * 9 + col, ArrowDown: Math.min(8, row + 1) * 9 + col, Home: row * 9, End: row * 9 + 8 };
+        if (Object.hasOwn(moves, event.key)) { event.preventDefault(); selectCell(moves[event.key]); }
+      }
+    });
+    // A pasted 81-character grid is one undoable edit. Dots and zeros are blanks.
+    grid.addEventListener('paste', event => {
+      if (teaching) { event.preventDefault(); toast('Return to the builder before pasting a new puzzle.'); return; }
+      const text = event.clipboardData?.getData('text/plain').replace(/\s/g, '') || '';
+      if (text.length === 1 && /^[1-9]$/.test(text)) { event.preventDefault(); enter(Number(text)); return; }
+      if (text.length === 81 && /^[0-9.]+$/.test(text)) {
+        event.preventDefault(); commit(Array.from(text, c => c === '.' ? 0 : Number(c)), 0);
+        cells[selected].focus({ preventScroll: true }); toast('Puzzle pasted. Undo brings back your previous grid.');
+      } else if (text) { event.preventDefault(); toast('Paste 81 digits, using 0 or . for empty cells.'); }
+    });
+    window.addEventListener('pagehide', () => {
+      if (saveAvailable) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(board)); } catch {} }
+    });
+    conflicts = findConflicts(); render(); queueCheck();
+  })();
+  </script>
+</body>
+</html>
