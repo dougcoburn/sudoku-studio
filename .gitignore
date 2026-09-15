@@ -2,3 +2,4 @@ node_modules/
 test-results/
 .DS_Store
 /queens.js
+.sudoku-mirror.tgz
