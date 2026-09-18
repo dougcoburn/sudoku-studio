@@ -110,6 +110,20 @@
     .difficulty-button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; padding: 8px; border: 1px solid #daddd1; border-radius: 7px; background: var(--surface); color: var(--green); font-size: 12px; }
     .difficulty-button:hover:enabled { background: var(--green-soft); border-color: #aebea3; }
     .difficulty-button svg { width: 15px; height: 15px; }
+
+    .seed-controls { margin-top: 12px; }
+    .seed-label { display: block; margin: 0 0 6px; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.02em; }
+    .seed-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: stretch; }
+    .seed-row input, .seed-display input {
+      min-width: 0; width: 100%; box-sizing: border-box; min-height: 38px; padding: 8px 10px;
+      border: 1px solid #daddd1; border-radius: 7px; background: var(--surface); color: var(--ink);
+      font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .seed-row input:focus, .seed-display input:focus { outline: 2px solid #aebea3; outline-offset: 1px; }
+    .seed-row .difficulty-button { white-space: nowrap; padding: 8px 12px; }
+    .seed-display { margin-top: 8px; }
+    .seed-display[hidden] { display: none !important; }
+    .seed-display label { display: block; margin: 0 0 4px; color: var(--muted); font-size: 10px; }
     .difficulty-note { margin: 8px 0 0; min-height: 30px; color: var(--muted); font-size: 10px; line-height: 1.5; }
     #retry-removal { padding-left: 0; font-size: 11px; }
     .teach-controls { display: flex; gap: 8px; margin-bottom: 14px; }
@@ -310,6 +324,17 @@
         </section>
         <div id="builder-controls">
         <button id="load-example" class="example-button">Try an example puzzle<svg aria-hidden="true"><use href="#i-arrow"/></svg></button>
+        <div id="seed-controls" class="seed-controls" role="group" aria-label="Load puzzle from seed number">
+          <label class="seed-label" for="seed-input">Seed number</label>
+          <div class="seed-row">
+            <input id="seed-input" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="Integer (any length)" aria-label="Seed number">
+            <button id="load-seed" type="button" class="difficulty-button">Load from number</button>
+          </div>
+          <div id="seed-display" class="seed-display" hidden>
+            <label for="seed-current">Current seed (from generator)</label>
+            <input id="seed-current" type="text" readonly aria-label="Current seed number">
+          </div>
+        </div>
         <div id="difficulty-controls" role="group" aria-label="Adjust puzzle clues" data-removal-state="unavailable">
           <div class="difficulty-buttons">
             <button id="harder" class="difficulty-button" aria-describedby="difficulty-note" disabled><svg aria-hidden="true"><use href="#i-minus"/></svg>Harder</button>
@@ -324,6 +349,285 @@
     <footer class="page-footer"><span>Made for the quiet art of puzzle making.</span><span class="save-state"><svg aria-hidden="true"><use href="#i-check"/></svg><span id="save-state">Draft saved in this browser</span></span></footer>
   </div>
   <div id="toast" class="toast" role="status" hidden></div>
+  <script>
+/**
+ * sudoku.js — generated/hand-ported from sudoku.ts (keep in sync).
+ * Deterministic completed Sudoku from a BigInt. No Math.random.
+ * Classic script + CommonJS: sets globalThis.SudokuSeed; module.exports when available.
+ */
+(function (root) {
+'use strict';
+
+const BAND_COUNT = 416n;
+const SYM_ORDER = 1_218_998_108_160n; // 9! * 6^8 * 2
+const FILL_UPPER = 6n ** 9n * 5n ** 9n * 4n ** 9n * 3n ** 9n * 2n ** 9n;
+const INPUT_SPAN = BAND_COUNT * FILL_UPPER * SYM_ORDER;
+
+/** 416 essentially different minlex top bands. Source: GPenet t416. */
+const BANDS = [
+  "123456789456789123789123456", "123456789456789123789123465", "123456789456789123789123564", "123456789456789123789132465",
+  "123456789456789123789132546", "123456789456789123789132564", "123456789456789123789231564", "123456789456789123789231645",
+  "123456789456789123798132465", "123456789456789123798132546", "123456789456789123798132564", "123456789456789123798213564",
+  "123456789456789123798213654", "123456789456789123798231564", "123456789456789123798231645", "123456789456789123897231564",
+  "123456789456789123897231645", "123456789456789132789123546", "123456789456789132789132546", "123456789456789132789132564",
+  "123456789456789132789213456", "123456789456789132789213645", "123456789456789132789213654", "123456789456789132789231546",
+  "123456789456789132789231564", "123456789456789132879231564", "123456789456789231789123645", "123456789456789231789132546",
+  "123456789456789231789231564", "123456789456789231789312456", "123456789456789231798213645", "123456789457189236689237145",
+  "123456789457189236689237154", "123456789457189236689237415", "123456789457189236689237451", "123456789457189236689237514",
+  "123456789457189236689237541", "123456789457189236689273145", "123456789457189236689273154", "123456789457189236689273415",
+  "123456789457189236689273451", "123456789457189236689273514", "123456789457189236689273541", "123456789457189236689327145",
+  "123456789457189236689327154", "123456789457189236689327415", "123456789457189236689327451", "123456789457189236689327514",
+  "123456789457189236689327541", "123456789457189236689372145", "123456789457189236689372154", "123456789457189236689372415",
+  "123456789457189236689372451", "123456789457189236689372514", "123456789457189236689372541", "123456789457189236689723145",
+  "123456789457189236689723154", "123456789457189236689723415", "123456789457189236689723514", "123456789457189236689723541",
+  "123456789457189236689732145", "123456789457189236689732154", "123456789457189236689732415", "123456789457189236689732514",
+  "123456789457189236689732541", "123456789457189236698237145", "123456789457189236698237154", "123456789457189236698237415",
+  "123456789457189236698237514", "123456789457189236698237541", "123456789457189236698273145", "123456789457189236698273154",
+  "123456789457189236698273415", "123456789457189236698273514", "123456789457189236698273541", "123456789457189236698327145",
+  "123456789457189236698327154", "123456789457189236698327415", "123456789457189236698327541", "123456789457189236698372145",
+  "123456789457189236698372154", "123456789457189236698372415", "123456789457189236698372514", "123456789457189236698372541",
+  "123456789457189236698723145", "123456789457189236698723154", "123456789457189236698723415", "123456789457189236698723514",
+  "123456789457189236698732145", "123456789457189236698732154", "123456789457189236698732415", "123456789457189236698732514",
+  "123456789457189236869237145", "123456789457189236869237514", "123456789457189236869273145", "123456789457189236869273154",
+  "123456789457189236869273415", "123456789457189236869273514", "123456789457189236869327154", "123456789457189236869327415",
+  "123456789457189236869327514", "123456789457189236869372145", "123456789457189236869372154", "123456789457189236869372415",
+  "123456789457189236869372514", "123456789457189236869723145", "123456789457189236869723154", "123456789457189236869723514",
+  "123456789457189236869732145", "123456789457189236869732154", "123456789457189236896237145", "123456789457189236896237154",
+  "123456789457189236896237514", "123456789457189236896273145", "123456789457189236896273154", "123456789457189236896273514",
+  "123456789457189236896327145", "123456789457189236896327154", "123456789457189236896327514", "123456789457189236896372145",
+  "123456789457189236896372154", "123456789457189236896372514", "123456789457189236896723154", "123456789457189236896723514",
+  "123456789457189236896732154", "123456789457189236896732514", "123456789457189236968237154", "123456789457189236968237514",
+  "123456789457189236968273514", "123456789457189236968327154", "123456789457189236968327514", "123456789457189236968372154",
+  "123456789457189236968372514", "123456789457189236968723154", "123456789457189236968732154", "123456789457189236986237154",
+  "123456789457189236986273154", "123456789457189236986327154", "123456789457189236986372154", "123456789457189263689237145",
+  "123456789457189263689237415", "123456789457189263689237451", "123456789457189263689237514", "123456789457189263689273154",
+  "123456789457189263689273415", "123456789457189263689273451", "123456789457189263689273514", "123456789457189263689273541",
+  "123456789457189263689327154", "123456789457189263689327415", "123456789457189263689327514", "123456789457189263689327541",
+  "123456789457189263689372145", "123456789457189263689372154", "123456789457189263689372415", "123456789457189263689372451",
+  "123456789457189263689372514", "123456789457189263689723145", "123456789457189263689723154", "123456789457189263689723451",
+  "123456789457189263689732145", "123456789457189263689732154", "123456789457189263689732415", "123456789457189263689732451",
+  "123456789457189263689732514", "123456789457189263689732541", "123456789457189263698237154", "123456789457189263698237415",
+  "123456789457189263698237451", "123456789457189263698237514", "123456789457189263698273145", "123456789457189263698273415",
+  "123456789457189263698273451", "123456789457189263698273514", "123456789457189263698327145", "123456789457189263698327154",
+  "123456789457189263698327415", "123456789457189263698327451", "123456789457189263698327514", "123456789457189263698372154",
+  "123456789457189263698372415", "123456789457189263698372514", "123456789457189263698372541", "123456789457189263698732145",
+  "123456789457189263698732154", "123456789457189263698732451", "123456789457189263869237154", "123456789457189263869237415",
+  "123456789457189263869237514", "123456789457189263869273451", "123456789457189263869327415", "123456789457189263869327451",
+  "123456789457189263869327514", "123456789457189263869372145", "123456789457189263869372154", "123456789457189263869372514",
+  "123456789457189263896237145", "123456789457189263896237154", "123456789457189263896237451", "123456789457189263896327145",
+  "123456789457189263896327154", "123456789457189263896327415", "123456789457189263896327451", "123456789457189263896327514",
+  "123456789457189263896327541", "123456789457189263896372145", "123456789457189263896372154", "123456789457189263896372451",
+  "123456789457189263968327145", "123456789457189263968327154", "123456789457189263968327415", "123456789457189263968327514",
+  "123456789457189263968327541", "123456789457189263968372145", "123456789457189263986327145", "123456789457189263986327154",
+  "123456789457189263986327451", "123456789457189326689237451", "123456789457189326689237514", "123456789457189326689237541",
+  "123456789457189326689273145", "123456789457189326689273451", "123456789457189326689273541", "123456789457189326689327154",
+  "123456789457189326689327451", "123456789457189326689327541", "123456789457189326689372415", "123456789457189326689372541",
+  "123456789457189326689723145", "123456789457189326689723415", "123456789457189326689732145", "123456789457189326689732415",
+  "123456789457189326689732514", "123456789457189326689732541", "123456789457189326698237145", "123456789457189326698237541",
+  "123456789457189326698273514", "123456789457189326698273541", "123456789457189326698732415", "123456789457189326869372514",
+  "123456789457189623689237145", "123456789457189623689237154", "123456789457189623689273145", "123456789457189623689273154",
+  "123456789457189623689273541", "123456789457189623689327145", "123456789457189623689327154", "123456789457189623689372145",
+  "123456789457189623689372154", "123456789457189623689372514", "123456789457189623689723145", "123456789457189623689723154",
+  "123456789457189623689723415", "123456789457189623689723451", "123456789457189623689723514", "123456789457189623689723541",
+  "123456789457189623689732145", "123456789457189623689732154", "123456789457189623689732415", "123456789457189623689732451",
+  "123456789457189623689732514", "123456789457189623689732541", "123456789457189623698237145", "123456789457189623698237154",
+  "123456789457189623698237541", "123456789457189623698273145", "123456789457189623698273154", "123456789457189623698327145",
+  "123456789457189623698327154", "123456789457189623698327514", "123456789457189623698372145", "123456789457189623698372154",
+  "123456789457189623698732145", "123456789457189623698732154", "123456789457189623698732415", "123456789457189623698732514",
+  "123456789457189623698732541", "123456789457189623869237145", "123456789457189623869273145", "123456789457189623869273154",
+  "123456789457189623869273451", "123456789457189623869327154", "123456789457189623869372145", "123456789457189623869372154",
+  "123456789457189623896237145", "123456789457189623896237154", "123456789457189623896237415", "123456789457189623896237451",
+  "123456789457189623896237514", "123456789457189623896237541", "123456789457189623896327145", "123456789457189623896327154",
+  "123456789457189623896327415", "123456789457189623896327451", "123456789457189623896327514", "123456789457189623896372145",
+  "123456789457189623896372154", "123456789457189623896372451", "123456789457189623968327145", "123456789457189623968327154",
+  "123456789457189623968327415", "123456789457189623968372145", "123456789457189623968372154", "123456789457189623986327145",
+  "123456789457189623986327154", "123456789457189623986327415", "123456789457189623986327451", "123456789457189623986327514",
+  "123456789457189623986327541", "123456789457189632689237145", "123456789457189632689273145", "123456789457189632689273154",
+  "123456789457189632689273514", "123456789457189632689327154", "123456789457189632689372145", "123456789457189632689372154",
+  "123456789457189632689723145", "123456789457189632689723514", "123456789457189632689732145", "123456789457189632689732154",
+  "123456789457189632689732514", "123456789457189632689732541", "123456789457189632698237145", "123456789457189632698237154",
+  "123456789457189632698237514", "123456789457189632698273145", "123456789457189632698327145", "123456789457189632698327154",
+  "123456789457189632698327541", "123456789457189632698372154", "123456789457189632698732145", "123456789457189632698732514",
+  "123456789457189632869273145", "123456789457189632869372145", "123456789457189632896237145", "123456789457189632896237415",
+  "123456789457189632896327145", "123456789457189632896327154", "123456789457189632896327451", "123456789457189632896327541",
+  "123456789457189632896372145", "123456789457189632896372154", "123456789457189632896372451", "123456789457189632968327145",
+  "123456789457189632968327154", "123456789457189632968327451", "123456789457189632986327145", "123456789457289163689173452",
+  "123456789457289163689713254", "123456789457289163698137425", "123456789457289163698137524", "123456789457289163698317254",
+  "123456789457289163698317524", "123456789457289163698713254", "123456789457289163869713245", "123456789457289163869731245",
+  "123456789457289163869731524", "123456789457289163896317245", "123456789457289163896731524", "123456789457289613689173245",
+  "123456789457289613689713245", "123456789457289613689713254", "123456789457289613698137254", "123456789457289613698317245",
+  "123456789457289613698317254", "123456789457289613698713245", "123456789457289613869713245", "123456789457289613869731245",
+  "123456789457289613869731254", "123456789457289613896137245", "123456789457289613896137254", "123456789457289613896317245",
+  "123456789457289613896317425", "123456789457289613896731245", "123456789457289613896731254", "123456789457289613968137245",
+  "123456789457289613968137254", "123456789457289613968731245", "123456789457289613986137245", "123456789457289631689173245",
+  "123456789457289631689713254", "123456789457289631698317254", "123456789457289631869713245", "123456789457289631869713254",
+  "123456789457289631869731245", "123456789457289631869731254", "123456789457289631896137245", "123456789457289631896137254",
+  "123456789457289631896137425", "123456789457289631896317245", "123456789457289631896317254", "123456789457289631896731245",
+  "123456789457289631968137254", "123456789457289631968731245", "123456789457289631968731254", "123456789457289631986137245",
+  "123456789457289631986137254", "123456789457389612896127345", "123456789457389612896127354", "123456789457389612896172345",
+  "123456789457389612896172354", "123456789457389612896217345", "123456789457389612896217354", "123456789457389612896271345",
+  "123456789457389612896271354", "123456789457389612896712354", "123456789457389612896721354", "123456789457389612986172354",
+  "123456789457389612986217354", "123456789457389621896127345", "123456789457389621896217354", "123456789457389621986127354",
+  "123456789457893612896127345", "123456789457893612896127354", "123456789457893612896217354", "123456789457893612986217354"
+];
+
+const FACT = [
+  1n, 1n, 2n, 6n, 24n, 120n, 720n, 5040n, 40320n, 362880n,
+];
+
+function unrankPerm(n, k) {
+  const items = Array.from({ length: k }, (_, i) => i);
+  const out = [];
+  for (let left = k; left >= 1; left--) {
+    const f = FACT[left - 1];
+    const idx = Number(n.v / f);
+    n.v = n.v % f;
+    out.push(items.splice(idx % items.length, 1)[0]);
+  }
+  return out;
+}
+
+function boxOf(r, c) {
+  return Math.floor(r / 3) * 3 + Math.floor(c / 3);
+}
+
+function usedAt(grid, r, c) {
+  let mask = 0;
+  for (let i = 0; i < 9; i++) {
+    if (grid[r][i]) mask |= 1 << grid[r][i];
+    if (grid[i][c]) mask |= 1 << grid[i][c];
+  }
+  const br = Math.floor(r / 3) * 3;
+  const bc = Math.floor(c / 3) * 3;
+  for (let i = 0; i < 3; i++)
+    for (let j = 0; j < 3; j++) {
+      const d = grid[br + i][bc + j];
+      if (d) mask |= 1 << d;
+    }
+  return mask;
+}
+
+function legalDigits(grid, r, c) {
+  const used = usedAt(grid, r, c);
+  const out = [];
+  for (let d = 1; d <= 9; d++) if ((used & (1 << d)) === 0) out.push(d);
+  return out;
+}
+
+function fillRows(grid, n) {
+  const cells = [];
+  for (let r = 3; r < 9; r++) for (let c = 0; c < 9; c++) cells.push([r, c]);
+
+  function rec(i) {
+    if (i === cells.length) return true;
+    const [r, c] = cells[i];
+    const legal = legalDigits(grid, r, c);
+    if (legal.length === 0) return false;
+    const k = BigInt(legal.length);
+    const pick = Number(n.v % k);
+    n.v = n.v / k;
+    for (let off = 0; off < legal.length; off++) {
+      const d = legal[(pick + off) % legal.length];
+      grid[r][c] = d;
+      if (rec(i + 1)) return true;
+      grid[r][c] = 0;
+    }
+    return false;
+  }
+  return rec(0);
+}
+
+function applySymmetry(grid, n) {
+  const transpose = Number(n.v % 2n) === 1;
+  n.v = n.v / 2n;
+  const colInStack = [unrankPerm(n, 3), unrankPerm(n, 3), unrankPerm(n, 3)];
+  const stacks = unrankPerm(n, 3);
+  const rowInBand = [unrankPerm(n, 3), unrankPerm(n, 3), unrankPerm(n, 3)];
+  const bands = unrankPerm(n, 3);
+  const digits = unrankPerm(n, 9); // 0..8 -> digit 1..9 maps from old digit-1
+
+  const colOf = new Array(9);
+  for (let s = 0; s < 3; s++)
+    for (let k = 0; k < 3; k++) colOf[s * 3 + k] = stacks[s] * 3 + colInStack[s][k];
+
+  const rowOf = new Array(9);
+  for (let b = 0; b < 3; b++)
+    for (let k = 0; k < 3; k++) rowOf[b * 3 + k] = bands[b] * 3 + rowInBand[b][k];
+
+  const mapD = (d) => digits[d - 1] + 1;
+
+  const out = Array.from({ length: 9 }, () => Array(9).fill(0));
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      const d = mapD(grid[r][c]);
+      const nr = rowOf[r];
+      const nc = colOf[c];
+      if (transpose) out[nc][nr] = d;
+      else out[nr][nc] = d;
+    }
+  }
+  return out;
+}
+
+function gridToString(grid) {
+  let s = "";
+  for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) s += String(grid[r][c]);
+  return s;
+}
+
+/** 81-char completed Sudoku. Same n always yields the same string. */
+function generateSudoku(n) {
+  if (n < 0n) n = -n;
+  const bandIndex = Number(n % BAND_COUNT);
+  n = n / BAND_COUNT;
+  const band = BANDS[bandIndex];
+  const grid = Array.from({ length: 9 }, () => Array(9).fill(0));
+  for (let r = 0; r < 3; r++)
+    for (let c = 0; c < 9; c++) grid[r][c] = band.charCodeAt(r * 9 + c) - 48;
+
+  const token = { v: n };
+  if (!fillRows(grid, token)) {
+    throw new Error(`band ${bandIndex} failed to complete`);
+  }
+  const shuffled = applySymmetry(grid, token);
+  return gridToString(shuffled);
+}
+
+function isValidComplete(s) {
+  if (!/^[1-9]{81}$/.test(s)) return false;
+  const g = [];
+  for (let r = 0; r < 9; r++) {
+    g.push([]);
+    for (let c = 0; c < 9; c++) g[r][c] = s.charCodeAt(r * 9 + c) - 48;
+  }
+  const full = 0b1111111110;
+  for (let i = 0; i < 9; i++) {
+    let row = 0, col = 0, box = 0;
+    for (let j = 0; j < 9; j++) {
+      row |= 1 << g[i][j];
+      col |= 1 << g[j][i];
+      box |= 1 << g[Math.floor(i / 3) * 3 + Math.floor(j / 3)][(i % 3) * 3 + (j % 3)];
+    }
+    if (row !== full || col !== full || box !== full) return false;
+  }
+  return true;
+}
+
+
+const SudokuSeed = {
+  BAND_COUNT,
+  SYM_ORDER,
+  FILL_UPPER,
+  INPUT_SPAN,
+  BANDS,
+  generateSudoku,
+  isValidComplete
+};
+root.SudokuSeed = SudokuSeed;
+if (typeof module !== 'undefined' && module.exports) module.exports = SudokuSeed;
+})(typeof globalThis !== 'undefined' ? globalThis : (typeof window !== 'undefined' ? window : this));
+
+  </script>
   <!-- Both the worker and the editor are inline: this file works without a server or dependencies. -->
   <script id="solver-worker" type="text/plain">
   'use strict';
@@ -668,6 +972,8 @@
     let lessonHistory = [], lessonFuture = [];
     const hintColors = ['row', 'column', 'box', 'pattern', 'result'];
     let removalState = 'unavailable', removableIndex = null;
+    // Shown only for boards produced by generateSudoku(n); cleared if givens diverge.
+    let seedActive = null, seededGrid = null;
     let history = [], future = [], conflicts = new Set();
     let worker = null, pending = false, requestId = 0;
     let debounceTimer, slowTimer, toastTimer, saveTimer;
@@ -965,6 +1271,7 @@
       teaching = false; currentHint = null; hintApplied = false;
       lessonNotes = Array(81).fill(0); lessonStarted = false;
       learned = Array(81).fill(0); excludedNotes = Array(81).fill(0); lessonHistory = []; lessonFuture = [];
+      clearSeedIfDiverged();
       conflicts = findConflicts(); saveDraft(); queueCheck();
     }
     function builderSnapshot() { return { board: board.slice(), notes: pencilNotes.slice(), selected }; }
@@ -1018,6 +1325,63 @@
       }
       if (!future.length) return;
       history.push(builderSnapshot()); restoreBuilder(future.pop());
+    }
+
+    function syncSeedDisplay() {
+      const display = $('seed-display'), field = $('seed-current');
+      if (seedActive != null) {
+        display.hidden = false;
+        field.value = seedActive;
+      } else {
+        display.hidden = true;
+        field.value = '';
+      }
+    }
+    function clearSeedIfDiverged() {
+      if (seedActive == null || !seededGrid) return;
+      if (board.some((value, i) => value !== seededGrid[i])) {
+        seedActive = null;
+        seededGrid = null;
+        syncSeedDisplay();
+      }
+    }
+    function loadFromSeed() {
+      if (typeof SudokuSeed === 'undefined' || !SudokuSeed.generateSudoku) {
+        toast('Seed generator failed to load.');
+        return false;
+      }
+      const raw = $('seed-input').value.trim();
+      if (!raw) {
+        toast('Enter a seed number.');
+        return false;
+      }
+      let n;
+      try {
+        n = BigInt(raw);
+      } catch {
+        toast('Seed must be a whole number (digits only, optional leading minus).');
+        return false;
+      }
+      let gridString;
+      try {
+        gridString = SudokuSeed.generateSudoku(n);
+      } catch (error) {
+        toast('Could not generate a Sudoku from that seed.');
+        console.error(error);
+        return false;
+      }
+      if (!SudokuSeed.isValidComplete(gridString)) {
+        toast('Generator returned an invalid grid.');
+        return false;
+      }
+      const next = Array.from(gridString, c => Number(c));
+      seedActive = n.toString();
+      seededGrid = next.slice();
+      commit(next, 0, Array(81).fill(0));
+      syncSeedDisplay();
+      cells[selected].focus({ preventScroll: true });
+      toast('Loaded completed grid from seed. Editing a clue hides the seed.');
+      return true;
     }
     function toast(message) {
       clearTimeout(toastTimer); $('toast').textContent = message; $('toast').hidden = false;
@@ -1129,6 +1493,10 @@
     $('load-example').addEventListener('click', () => {
       commit(Array.from(EXAMPLE, Number), 2, Array(81).fill(0)); cells[selected].focus({ preventScroll: true }); toast('Example loaded. Every clue is editable.');
     });
+    $('load-seed').addEventListener('click', () => loadFromSeed());
+    $('seed-input').addEventListener('keydown', event => {
+      if (event.key === 'Enter') { event.preventDefault(); loadFromSeed(); }
+    });
     $('retry-check').addEventListener('click', () => queueCheck(60000));
     $('retry-removal').addEventListener('click', () => queueCheck(60000));
     $('harder').addEventListener('click', () => {
@@ -1196,7 +1564,18 @@
     window.addEventListener('pagehide', () => {
       if (saveAvailable) { try { persistDraft(); } catch {} }
     });
-    conflicts = findConflicts(); render(); queueCheck();
+    syncSeedDisplay();
+    let loadedFromUrl = false;
+    try {
+      const urlSeed = new URLSearchParams(location.search).get('n');
+      if (urlSeed != null && urlSeed !== '') {
+        $('seed-input').value = urlSeed;
+        loadedFromUrl = loadFromSeed();
+      }
+    } catch {}
+    if (!loadedFromUrl) {
+      conflicts = findConflicts(); render(); queueCheck();
+    }
   })();
   </script>
 </body>
