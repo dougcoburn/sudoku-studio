@@ -638,6 +638,51 @@ test('browser: standalone file, editing, live checks, persistence, and responsiv
       assert.equal(await pencil.getAttribute('aria-pressed'), 'false', 'Losing focus clears a held modifier');
       await page.keyboard.up('Control');
     });
+    await t.test('entering a correct answer clears that digit from peer notes in one undoable step', async () => {
+      await paste(EXAMPLE); await settled('unique');
+      // C1 row peer D1, column peer C4, box peer A3, unrelated D4.
+      const peers = [3, 29, 18], unrelated = 30;
+      await pencil.click();
+      for (const i of [...peers, unrelated]) { await cell(i).click(); await noteButton(2).click(); await noteButton(4).click(); }
+      await pencil.click();
+      for (const i of [...peers, unrelated]) assert.equal(await marks(i), '24');
+      // The unique solution has 4 at C1, so 2 is a wrong answer.
+      await cell(2).click(); await page.keyboard.press('2'); await settled('none');
+      assert.equal(await cell(2).innerText(), '2');
+      for (const i of peers) assert.equal(await marks(i), '24', 'A wrong answer leaves peer notes untouched');
+      await page.keyboard.press('4'); await settled('unique');
+      assert.equal(await cell(2).innerText(), '4');
+      for (const i of peers) assert.equal(await marks(i), '2', `peer ${i} loses the 4`);
+      assert.equal(await marks(unrelated), '24', 'Cells outside the row, column, and box keep their notes');
+      assert.equal(await page.locator('#given-count').innerText(), '31');
+      await page.locator('#undo').click(); await settled('none');
+      assert.equal(await cell(2).innerText(), '2');
+      for (const i of peers) assert.equal(await marks(i), '24', 'One undo restores the previous digit and the cleared notes');
+      await page.locator('#undo').click(); await settled('unique');
+      assert.equal(await cell(2).innerText(), '');
+      await page.locator('#redo').click(); await page.locator('#redo').click(); await settled('unique');
+      assert.equal(await cell(2).innerText(), '4');
+      for (const i of peers) assert.equal(await marks(i), '2');
+      await page.locator('#erase').click(); await settled('unique');
+      for (const i of peers) assert.equal(await marks(i), '2', 'Erasing does not restore notes');
+      await page.locator('#undo').click(); await page.locator('#undo').click(); await page.locator('#undo').click(); await settled('unique');
+      assert.equal(await cell(2).innerText(), '');
+      await page.getByRole('button', { name: 'Enter 4', exact: true }).click(); await settled('unique');
+      for (const i of peers) assert.equal(await marks(i), '2', 'The on-screen pad clears peer notes too');
+      await page.locator('#undo').click(); await settled('unique');
+      for (const i of peers) assert.equal(await marks(i), '24');
+      // Correct entries keep clearing while the recheck of the previous edit is still running.
+      await cell(3).click(); await page.keyboard.press('6'); await cell(2).click(); await page.keyboard.press('4');
+      assert.equal(await marks(29), '2', 'A pending recheck does not forget the proven solution');
+      await settled('unique');
+      await page.locator('#undo').click(); await page.locator('#undo').click(); await settled('unique');
+      for (const i of peers) assert.equal(await marks(i), '24');
+      // Without a unique solution, correctness is unknown, so nothing is cleared.
+      await page.locator('#clear').click(); await settled('multiple');
+      await pencil.click(); await cell(1).click(); await noteButton(7).click(); await pencil.click();
+      await cell(0).click(); await page.keyboard.press('7'); await settled('multiple');
+      assert.equal(await marks(1), '7', 'Multiple-solution puzzles never auto-clear notes');
+    });
     await t.test('pencil practice in teaching mode stays separate from proven hint notes and original clues', async () => {
       await paste(EXAMPLE); await settled('unique');
       await cell(2).click(); await pencil.click(); await noteButton(1).click(); await pencil.click();

@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --test tests/sudoku.test.mjs tests/sudoku-generate.test.mjs",
+    "test": "node --test tests/sudoku.test.mjs tests/sudoku-generate.test.mjs tests/sudoku-notes.test.mjs",
     "test:solver": "node --test --test-name-pattern=solver tests/sudoku.test.mjs",
     "test:generate": "node --test tests/sudoku-generate.test.mjs"
   },
