@@ -951,6 +951,43 @@ if (typeof module !== 'undefined' && module.exports) module.exports = SudokuSeed
     return { next, candidates, coord };
   })();
   </script>
+  <script id="note-logic">
+  // Pure pencil-note helpers shared by the editor and Node tests.
+  const SudokuNotes = (() => {
+    const row = i => Math.floor(i / 9), col = i => i % 9, box = i => Math.floor(row(i) / 3) * 3 + Math.floor(col(i) / 3);
+    const peers = Array.from({ length: 81 }, (_, a) => Array.from({ length: 81 }, (_, b) => b).filter(b => b !== a && (row(a) === row(b) || col(a) === col(b) || box(a) === box(b))));
+    // Placing an answer rules that digit out of every note in the same row,
+    // column, and box. Returns a new array; only note masks ever change.
+    function clearPeerNotes(notes, index, value) {
+      const next = notes.slice();
+      if (!(value >= 1 && value <= 9)) return next;
+      const mask = 1 << (value - 1);
+      for (const peer of peers[index]) next[peer] &= ~mask;
+      return next;
+    }
+    // proof = { clues, solution } records a board the solver proved has exactly
+    // one solution. Any board that keeps all of those clues and only adds digits
+    // agreeing with that solution still has that same unique solution, so the
+    // proof stays valid across correct entries while a recheck is pending.
+    function provenSolution(board, proof) {
+      if (!proof) return null;
+      for (let i = 0; i < 81; i++) {
+        if (proof.clues[i] && board[i] !== proof.clues[i]) return null;
+        if (board[i] && board[i] !== proof.solution[i]) return null;
+      }
+      return proof.solution;
+    }
+    // True only when the digit is known to match the unique solution. Unknown,
+    // unproven, or multi-solution puzzles never count as correct.
+    function isCorrectEntry(board, proof, index, value) {
+      if (!(value >= 1 && value <= 9)) return false;
+      const before = board.slice(); before[index] = 0;
+      const known = provenSolution(before, proof);
+      return Boolean(known) && known[index] === value;
+    }
+    return { clearPeerNotes, provenSolution, isCorrectEntry, peers };
+  })();
+  </script>
   <script>
   (() => {
     'use strict';
@@ -967,6 +1004,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = SudokuSeed
     let pencilPinned = false, controlHeld = false, controlCommitted = false;
     // Preview values never enter the editable board, history, or saved draft.
     let solution = null, showingSolution = false;
+    // Last solver proof of a unique solution; see SudokuNotes.provenSolution.
+    let uniqueProof = null;
     let teaching = false, currentHint = null, hintStep = 0, hintApplied = false;
     let learned = Array(81).fill(0), excludedNotes = Array(81).fill(0);
     let lessonHistory = [], lessonFuture = [];
@@ -1239,7 +1278,13 @@ if (typeof module !== 'undefined' && module.exports) module.exports = SudokuSeed
     function applyHint() {
       if (!currentHint || hintApplied || hintStep !== currentHint.steps.length - 1 || !['placement', 'elimination'].includes(currentHint.type)) return;
       rememberLesson();
-      if (currentHint.type === 'placement') { learned[currentHint.target] = currentHint.value; lessonNotes[currentHint.target] = 0; }
+      if (currentHint.type === 'placement') {
+        // Hint placements are forced deductions, so they are correct whenever the
+        // puzzle is solvable; still defer to a proven solution if one disagrees.
+        const known = SudokuNotes.provenSolution(board, uniqueProof);
+        if (!known || known[currentHint.target] === currentHint.value) lessonNotes = SudokuNotes.clearPeerNotes(lessonNotes, currentHint.target, currentHint.value);
+        learned[currentHint.target] = currentHint.value; lessonNotes[currentHint.target] = 0;
+      }
       else for (const { index, mask } of currentHint.remove) excludedNotes[index] |= mask;
       hintApplied = true; render();
     }
@@ -1301,7 +1346,12 @@ if (typeof module !== 'undefined' && module.exports) module.exports = SudokuSeed
       if (pencilActive()) { editPencilNotes(value); return; }
       if (teaching) { toast('Turn on the pencil to practice notes, or use Apply hint to place a number.'); return; }
       if (!value && !board[selected] && pencilNotes[selected]) { editPencilNotes(0); return; }
-      const next = board.slice(); next[selected] = value; commit(next);
+      const next = board.slice(); next[selected] = value;
+      // Only a correct answer clears peer notes, and it rides in the same commit,
+      // so one undo restores both.
+      const correct = SudokuNotes.isCorrectEntry(board, uniqueProof, selected, value);
+      const notes = correct ? SudokuNotes.clearPeerNotes(pencilNotes, selected, value) : pencilNotes;
+      commit(next, selected, notes.map((mask, i) => next[i] ? 0 : mask));
     }
     function restoreBuilder(snapshot) {
       const boardChanged = snapshot.board.some((value, i) => value !== board[i]);
@@ -1437,6 +1487,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = SudokuSeed
             pending = data.status === 'unique'; clearTimeout(slowTimer);
             removalState = pending ? 'checking' : 'unavailable';
             solution = data.solution || null;
+            if (data.status === 'unique' && solution) uniqueProof = { clues: board.slice(), solution: solution.slice() };
             const totalMs = performance.now() - started;
             const timing = `Checked in ${totalMs < 1000 ? Math.max(1, Math.round(totalMs)) + ' ms' : (totalMs / 1000).toFixed(2) + ' s'}`;
             $('status-panel').dataset.elapsedMs = totalMs.toFixed(2);
